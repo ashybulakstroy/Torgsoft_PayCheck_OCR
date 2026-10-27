@@ -16,6 +16,7 @@ from rapidocr_onnxruntime import RapidOCR
 from rapidfuzz import fuzz, process
 
 from App.receipt_rectification import rectify_table
+from App.rotation_rectification import rotate_table_crop
 from App.ocr_catalog_eval import (ROOT, PASS_SIMILARITY, CatalogMatcher, aligned_lines,
                                   choose_row_boundaries, enforce_cell_boundaries, load_catalog,
                                   needs_review, parse_rows, review_reason, table_layout)
@@ -195,7 +196,11 @@ class ReceiptPipeline:
         job.image("crop", crop, "Crop · область таблицы", "Отдельное изображение, исходное фото сохранено")
         job.publish("region", target="original", box=[lo.tolist(), [int(hi[0]), int(lo[1])], hi.tolist(), [int(lo[0]), int(hi[1])]], progress=29)
         job.phase("geometry", 32, "Проверяем волны бумаги и выпрямляем таблицу")
-        rectified, map_x, map_y, metadata = rectify_table(image,polygon,trust_top=boundary["status"]=="detected")
+        if "partial_contour_replaced_by_full_grid_hypothesis" in boundary["warnings"]:
+            rectified, map_x, map_y, metadata = rotate_table_crop(image, polygon)
+        else:
+            rectified, map_x, map_y, metadata = rectify_table(
+                image, polygon, trust_top=boundary["status"]=="detected")
         warnings.extend(metadata["warnings"])
         subtitle = {"wave_grid":"Выпрямлены волны по внутренней сетке; ячейка итога сохранена",
                     "original_crop_fallback":"Сохранена исходная геометрия: требуется проверка"}.get(metadata["method"],"Выпрямлены границы; нижняя ячейка итога сохранена")

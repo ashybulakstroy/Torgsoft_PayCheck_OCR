@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from App.full_grid_boundary import detect_full_grid_boundary
+
 ALGORITHM_VERSION = "table-boundary-2.0"
 
 
@@ -198,8 +200,25 @@ def detect_table_boundary(image: np.ndarray, options: BoundaryOptions | None = N
         if intersection / max(union, 1) < .8:
             warnings.append("ambiguous_boundary_candidates")
             break
+
     def metadata(c):
         return {key: c[key] for key in ("score", "area", "bounds", "support", "source", "gap", "continuity", "column_span")}
+
+    # A hand or a dark annotation can close a single row into a high-scoring
+    # contour.  It must not become the OCR table.  Only for an already
+    # suspicious *and* implausibly small candidate, look for an independently
+    # supported full printed grid in the original-resolution image.
+    partial = w / width < .45 or h / height < .20
+    if warnings and partial:
+        fallback_polygon, fallback = detect_full_grid_boundary(image)
+        if fallback_polygon is not None:
+            fallback_selected = dict(source="full_grid_rules", bounds=[float(fallback_polygon[:, 0].min()),
+                                     float(fallback_polygon[:, 1].min()), float(np.ptp(fallback_polygon[:, 0])),
+                                     float(np.ptp(fallback_polygon[:, 1]))], **fallback)
+            return dict(polygon=fallback_polygon, status="needs_review",
+                        warnings=warnings + ["partial_contour_replaced_by_full_grid_hypothesis"],
+                        algorithm_version=ALGORITHM_VERSION, selected=fallback_selected,
+                        candidates=[metadata(c) for c in candidates[:10]])
     return dict(polygon=polygon, status="needs_review" if warnings else "detected",
                 warnings=warnings, algorithm_version=ALGORITHM_VERSION,
                 selected=metadata(best), candidates=[metadata(c) for c in candidates[:10]])

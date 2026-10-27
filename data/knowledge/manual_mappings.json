@@ -20,6 +20,36 @@
       "updated_at": "2026-10-27T01:27:25.737058+00:00",
       "job_id": "e1b454c902e941b2bf5c28aaf779201f",
       "row_id": 8
+    },
+    "шурупметал/метал60exprofiliam3": {
+      "ocr_key": "шурупметал/метал60exprofiliam3",
+      "ocr_raw": "Шуруп метал/метал 60 EXPROFILIAM3",
+      "catalog_key": "шypyп metaл metaл 60 exprofil amз",
+      "catalog_name": "Шуруп метал/метал 60 - EXPROFIL/АМЗ",
+      "article": "5560",
+      "updated_at": "2026-10-27T17:01:35.086587+00:00",
+      "job_id": "05a3795bb6774c429d577e8b3dfd7d6b",
+      "row_id": 9
+    },
+    "миксербольшой(пе-(doedodd": {
+      "ocr_key": "миксербольшой(пе-(doedodd",
+      "ocr_raw": "Миксер большой (пе- (doedodd",
+      "catalog_key": "mиkcep бoльшoй пepфopatop",
+      "catalog_name": "Миксер большой (перфоратор)",
+      "article": "МПБ",
+      "updated_at": "2026-10-27T17:02:42.573463+00:00",
+      "job_id": "05a3795bb6774c429d577e8b3dfd7d6b",
+      "row_id": 5
+    },
+    "коврикбезузора06/09": {
+      "ocr_key": "коврикбезузора06/09",
+      "ocr_raw": "Коврик без узора 06/09",
+      "catalog_key": "kobpиk бeз yзopa 60 90",
+      "catalog_name": "Коврик без узора 60/90",
+      "article": "9755213",
+      "updated_at": "2026-10-27T17:08:28.328630+00:00",
+      "job_id": "930c16843738472989a8d9ac468a882b",
+      "row_id": 7
     }
   },
   "history": [
@@ -51,6 +81,51 @@
         "updated_at": "2026-10-27T01:27:25.737058+00:00",
         "job_id": "e1b454c902e941b2bf5c28aaf779201f",
         "row_id": 8
+      }
+    },
+    {
+      "ocr_key": "шурупметал/метал60exprofiliam3",
+      "recorded_at": "2026-10-27T17:01:35.086587+00:00",
+      "before": null,
+      "after": {
+        "ocr_key": "шурупметал/метал60exprofiliam3",
+        "ocr_raw": "Шуруп метал/метал 60 EXPROFILIAM3",
+        "catalog_key": "шypyп metaл metaл 60 exprofil amз",
+        "catalog_name": "Шуруп метал/метал 60 - EXPROFIL/АМЗ",
+        "article": "5560",
+        "updated_at": "2026-10-27T17:01:35.086587+00:00",
+        "job_id": "05a3795bb6774c429d577e8b3dfd7d6b",
+        "row_id": 9
+      }
+    },
+    {
+      "ocr_key": "миксербольшой(пе-(doedodd",
+      "recorded_at": "2026-10-27T17:02:42.573463+00:00",
+      "before": null,
+      "after": {
+        "ocr_key": "миксербольшой(пе-(doedodd",
+        "ocr_raw": "Миксер большой (пе- (doedodd",
+        "catalog_key": "mиkcep бoльшoй пepфopatop",
+        "catalog_name": "Миксер большой (перфоратор)",
+        "article": "МПБ",
+        "updated_at": "2026-10-27T17:02:42.573463+00:00",
+        "job_id": "05a3795bb6774c429d577e8b3dfd7d6b",
+        "row_id": 5
+      }
+    },
+    {
+      "ocr_key": "коврикбезузора06/09",
+      "recorded_at": "2026-10-27T17:08:28.328630+00:00",
+      "before": null,
+      "after": {
+        "ocr_key": "коврикбезузора06/09",
+        "ocr_raw": "Коврик без узора 06/09",
+        "catalog_key": "kobpиk бeз yзopa 60 90",
+        "catalog_name": "Коврик без узора 60/90",
+        "article": "9755213",
+        "updated_at": "2026-10-27T17:08:28.328630+00:00",
+        "job_id": "930c16843738472989a8d9ac468a882b",
+        "row_id": 7
       }
     }
   ]
