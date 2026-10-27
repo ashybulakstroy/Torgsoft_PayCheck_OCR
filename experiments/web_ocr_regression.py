@@ -56,7 +56,10 @@ def assess(case,candidate):
     old=[r for r in before['rows'] if r['kind'] in {'product','service','tax'}]
     new=[r for r in after['rows'] if r['kind'] in {'product','service','tax'}]
     reasons=[];changes=[]
-    if len(old)!=len(new):reasons.append(f'число строк {len(old)} → {len(new)}: требуется эталон')
+    if len(old)!=len(new):
+        message=f'число строк {len(old)} → {len(new)}'
+        if candidate.get('verified'):changes.append(message)
+        else:reasons.append(message+': требуется эталон')
     def key(value):return ''.join(str(value).casefold().split())
     for index,(a,b) in enumerate(zip(old,new),1):
         if a['kind']!=b['kind']:reasons.append(f'строка {index}: изменён тип')

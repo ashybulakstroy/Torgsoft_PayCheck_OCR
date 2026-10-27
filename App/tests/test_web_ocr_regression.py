@@ -74,6 +74,20 @@ def test_unverified_regrouping_is_failure(tmp_path):
     assert code==1 and 'эталоном' in ';'.join(summary['records'][0]['reasons'])
 
 
+def test_verified_reference_can_approve_restored_row_count(tmp_path):
+    write_job(tmp_path/'jobs',1)
+    def changed(case):
+        result=unchanged(case)
+        result['receipt']['rows'].append(copy.deepcopy(result['receipt']['rows'][0]))
+        result['receipt']['total_raw']='20'
+        result['receipt']['expected_total']='20'
+        result['verified']=True
+        return result
+    code,summary=run(changed,tmp_path/'jobs',tmp_path/'out',limit=1,emit=quiet)
+    assert code==0
+    assert summary['better']==1 and summary['worse']==0
+
+
 def test_exceptions_stop_not_skip(tmp_path):
     for index in range(2):write_job(tmp_path/'jobs',index)
     def crash(case):raise RuntimeError('OCR crashed')
