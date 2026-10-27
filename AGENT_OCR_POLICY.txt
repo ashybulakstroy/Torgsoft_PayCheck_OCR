@@ -1,0 +1,10 @@
+AGENT OCR POLICY
+
+1. Keep every experimental change in a separate file/module.
+2. Store experimental artifacts under R:\TEMP if the directory exists.
+3. For any feature that affects images, geometry, or OCR, run validation on all photo files in the dataset.
+4. Report a summary: files tested, worse, better, unchanged, mean delta lines, mean delta confidence.
+5. If there are no absolute degradations and there are absolute improvements, recommend integration into the main application module.
+6. If regressions remain or there are no clear gains, do not recommend integration.
+7. Always use the project venv: .\.venv\Scripts\python.exe
+8. OCR output is the decisive validation signal.

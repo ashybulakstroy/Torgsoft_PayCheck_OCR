@@ -1,0 +1,1 @@
+"""Receipt geometry processing package."""

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "mappings": {
+    "kpackaalvanprince1193.5kr": {
+      "ocr_key": "kpackaalvanprince1193.5kr",
+      "ocr_raw": "Kpacka Alvan Prince 1193.5 kr",
+      "catalog_key": "kpacka alvan prince 119 3.5 kг",
+      "catalog_name": "Краска Alvan Prince 119 3.5 кг",
+      "article": "9760712",
+      "updated_at": "2026-10-26T15:17:30.481375+00:00",
+      "job_id": "a03ac54a488a4497a34faa81b004f467",
+      "row_id": 5
+    },
+    "лезвиясегмент-эжонвэн18x100мм\"эксперт\"10шt": {
+      "ocr_key": "лезвиясегмент-эжонвэн18x100мм\"эксперт\"10шt",
+      "ocr_raw": "ЛЕЗВИЯ СЕГМЕНТ- ЭЖОН В ЭН 18x100мм\"ЭКСПЕРТ\" 10шT",
+      "catalog_key": "лeзbия ceгmehthыe для hoжeй 18x100mm эkcпept 10шt",
+      "catalog_name": "ЛЕЗВИЯ СЕГМЕНТНЫЕ ДЛЯ НОЖЕЙ 18х100мм \"ЭКСПЕРТ\" 10шт",
+      "article": "1018",
+      "updated_at": "2026-10-27T01:27:25.737058+00:00",
+      "job_id": "e1b454c902e941b2bf5c28aaf779201f",
+      "row_id": 8
+    }
+  },
+  "history": [
+    {
+      "ocr_key": "kpackaalvanprince1193.5kr",
+      "recorded_at": "2026-10-26T15:17:30.481375+00:00",
+      "before": null,
+      "after": {
+        "ocr_key": "kpackaalvanprince1193.5kr",
+        "ocr_raw": "Kpacka Alvan Prince 1193.5 kr",
+        "catalog_key": "kpacka alvan prince 119 3.5 kг",
+        "catalog_name": "Краска Alvan Prince 119 3.5 кг",
+        "article": "9760712",
+        "updated_at": "2026-10-26T15:17:30.481375+00:00",
+        "job_id": "a03ac54a488a4497a34faa81b004f467",
+        "row_id": 5
+      }
+    },
+    {
+      "ocr_key": "лезвиясегмент-эжонвэн18x100мм\"эксперт\"10шt",
+      "recorded_at": "2026-10-27T01:27:25.737058+00:00",
+      "before": null,
+      "after": {
+        "ocr_key": "лезвиясегмент-эжонвэн18x100мм\"эксперт\"10шt",
+        "ocr_raw": "ЛЕЗВИЯ СЕГМЕНТ- ЭЖОН В ЭН 18x100мм\"ЭКСПЕРТ\" 10шT",
+        "catalog_key": "лeзbия ceгmehthыe для hoжeй 18x100mm эkcпept 10шt",
+        "catalog_name": "ЛЕЗВИЯ СЕГМЕНТНЫЕ ДЛЯ НОЖЕЙ 18х100мм \"ЭКСПЕРТ\" 10шт",
+        "article": "1018",
+        "updated_at": "2026-10-27T01:27:25.737058+00:00",
+        "job_id": "e1b454c902e941b2bf5c28aaf779201f",
+        "row_id": 8
+      }
+    }
+  ]
+}

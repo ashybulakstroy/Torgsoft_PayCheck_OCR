@@ -1,0 +1,27 @@
+# Local configuration and Python environment
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime artifacts, OCR caches and generated reports
+.cache/
+web_outputs/
+eval_outputs/
+debug_outputs/
+reports/ocr_regression/
+experiment_outputs/
+debug_notes/
+*.log
+
+# Local input data and downloaded model weights
+data/in_data/
+models/
+
+# Backup archives and editor/system files
+*.zip
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

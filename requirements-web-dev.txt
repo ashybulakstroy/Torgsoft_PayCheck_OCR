@@ -1,0 +1,2 @@
+# Only needed for the explicit browser check, not for running the server.
+playwright==1.64.1

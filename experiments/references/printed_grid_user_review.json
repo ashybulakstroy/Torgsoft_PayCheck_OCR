@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "receipts": {
+    "7024426dc8e54e90a35ca8e4ccf23853": {
+      "reviewer": "user",
+      "review_date": "2026-10-27",
+      "confirmation": "User visually reviewed this receipt and confirmed that the new grouping is correct.",
+      "input_sha256": {
+        "original.png": "3990759383fcbf5da677857cdfea80834346f74e36e3067139a92570b6b2c228",
+        "rectified.png": "8b25b96ce5cb22717c93e4179526c42ccdea6ea1624ce7e732aa930db589dd40",
+        "ocr_rectified.json": "d5e0bb6601447bcd8b8175098c9567862ec14bd0ca0971e86ad4c1a67c7ba50e"
+      },
+      "expected_rows": [
+        [
+          "product",
+          "Киянка деревянная рукоятка 700 гр (бела- я) (ПОД ЗАКАЗ)",
+          "1",
+          "1050 T"
+        ],
+        [
+          "product",
+          "Нож Строительный LIDER/LIT/ MAXIMUM",
+          "1",
+          "270T"
+        ],
+        [
+          "product",
+          "Ножницы для резки металла EPA (EN-R1)",
+          "1",
+          "2500T"
+        ],
+        [
+          "product",
+          "Пистолет для силико- нa CKЕЛET",
+          "1",
+          "480 T"
+        ],
+        [
+          "product",
+          "Ремень Тонкими По- лосками (100м в бух- те) (Деш)",
+          "15",
+          "200 T"
+        ],
+        [
+          "product",
+          "СВП Зажим Ворота 1.0 мм АлексГрупп- МастерПласт (100±5)",
+          "15",
+          "700T"
+        ],
+        [
+          "tax",
+          "HDC 16 %",
+          "2848",
+          "1T"
+        ]
+      ]
+    },
+    "956225415c424d1493558f778795e592": {
+      "reviewer": "user",
+      "review_date": "2026-10-27",
+      "confirmation": "User approved the visual before/after demonstration of quantity 1 and price 242000.",
+      "input_sha256": {
+        "original.png": "239d56931742eb8580fd75ff96ab4f28d732775cc3d833d2dac26f27987c7b47",
+        "rectified.png": "d8071f7cc3690506ceeed27e4a4baf7aebb5b8f68cc24a36b4d1629a45615132",
+        "ocr_rectified.json": "91f00da90f17f1edaef2d9c1f5d461dc2839181a6db55f3f77e2c6ecbabc5d20"
+      },
+      "expected_rows": [
+        [
+          "product",
+          "Масло моторное 10W-40 полусинтет. для четырёхтактных двигателей, для тех- ники Huter, 1л. @",
+          "1",
+          "5780 T"
+        ],
+        [
+          "product",
+          "Электрогенератор DY6500L HUTER 5,5KBT @",
+          "1",
+          "242000 т"
+        ]
+      ]
+    }
+  }
+}
