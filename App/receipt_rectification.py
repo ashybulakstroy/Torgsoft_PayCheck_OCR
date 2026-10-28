@@ -6,15 +6,18 @@ import numpy as np
 
 from App.contour_unwarp import build_contour_map
 from App.wave_dewarp import find_rules, rectify
+from experiments.dewarp_necessity_detector import assess_dewarp_necessity
 
 
 def rectify_table(image, polygon, *, trust_top=True):
     polygon = np.asarray(polygon, np.float32)
     warnings = []
+    contour_valid = True
     try:
         mx, my, metadata = build_contour_map(polygon, trust_top=trust_top)
         baseline = cv2.remap(image, mx, my, cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255))
     except ValueError:
+        contour_valid = False
         lo = np.maximum(0, np.floor(polygon.min(axis=0)).astype(int) - 16)
         hi = np.minimum([image.shape[1], image.shape[0]], np.ceil(polygon.max(axis=0)).astype(int) + 17)
         baseline = image[lo[1]:hi[1], lo[0]:hi[0]].copy()
@@ -25,6 +28,25 @@ def rectify_table(image, polygon, *, trust_top=True):
         warnings.append("Выпрямление не удалось проверить: OCR выполнен по исходной области таблицы.")
 
     assessment = dict(status="not_selected", reason="Сохранён проверенный результат по контуру")
+    try:
+        necessity = assess_dewarp_necessity(baseline)
+        metadata["dewarp_necessity"] = necessity
+        # UNCERTAIN and contour fallback preserve the established validator.
+        if contour_valid and necessity["decision"] == "SKIP":
+            assessment = dict(
+                status="skipped_not_needed",
+                selected=False,
+                reason=necessity["reason"],
+            )
+            metadata.update(
+                source_polygon=polygon.tolist(),
+                wave_assessment=assessment,
+                warnings=warnings,
+            )
+            return baseline, mx.astype(np.float32), my.astype(np.float32), metadata
+    except (ValueError, np.linalg.LinAlgError, cv2.error) as error:
+        warnings.append(f"Не удалось проверить необходимость Dewarp: {error}")
+
     try:
         output, wx, wy, wave, _ = rectify(image, polygon)
         assessment = dict(wave, selected=False)

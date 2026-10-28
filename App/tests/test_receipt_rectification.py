@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 from App.ocr_catalog_eval import aligned_lines, choose_row_boundaries, parse_rows, table_layout
 from App.receipt_rectification import rectify_table
@@ -31,6 +32,8 @@ def test_wave_failure_returns_established_contour_result(monkeypatch):
     mx,my,expected = module.build_contour_map(polygon)
     def failed(*args,**kwargs):
         raise ValueError("Unreliable grid")
+    monkeypatch.setattr(module,"assess_dewarp_necessity",lambda image: {
+        "decision":"DEWARP","needs_dewarp":True,"reason":"test"})
     monkeypatch.setattr(module,"rectify",failed)
     output,actual_x,actual_y,metadata = module.rectify_table(image,polygon)
     assert metadata["method"] == expected["method"]
@@ -44,12 +47,29 @@ def test_wave_and_contour_failure_keep_original_crop(monkeypatch):
     polygon = np.array([[20,20],[580,20],[580,370],[20,370]],np.float32)
     def failed(*args,**kwargs):
         raise ValueError("Unreliable geometry")
+    monkeypatch.setattr(module,"assess_dewarp_necessity",lambda image: {
+        "decision":"DEWARP","needs_dewarp":True,"reason":"test"})
     monkeypatch.setattr(module,"rectify",failed)
     monkeypatch.setattr(module,"build_contour_map",failed)
     output,mx,my,metadata = module.rectify_table(image,polygon)
     assert metadata["method"] == "original_crop_fallback"
     assert np.array_equal(output,image[4:387,4:597])
     assert mx[0,0]==4 and my[0,0]==4
+
+
+def test_dewarp_gate_keeps_contour_result_when_curvature_is_not_proven(monkeypatch):
+    from App import receipt_rectification as module
+    image = np.full((400,600,3),255,np.uint8)
+    polygon = np.array([[20,20],[580,20],[580,370],[20,370]],np.float32)
+    monkeypatch.setattr(module,"assess_dewarp_necessity",lambda candidate: {
+        "decision":"SKIP","needs_dewarp":False,"reason":"already straight"})
+    monkeypatch.setattr(module,"rectify",lambda *args,**kwargs: pytest.fail("wave dewarp must be skipped"))
+    output,mx,my,metadata = module.rectify_table(image,polygon)
+    assert output.shape == mx.shape + (3,)
+    assert my.shape == mx.shape
+    assert metadata["dewarp_necessity"]["decision"] == "SKIP"
+    assert metadata["wave_assessment"] == {
+        "status":"skipped_not_needed","selected":False,"reason":"already straight"}
 
 
 def test_verified_grid_does_not_split_wrapped_names_by_multiple_price_blocks():

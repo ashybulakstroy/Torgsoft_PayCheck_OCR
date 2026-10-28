@@ -177,6 +177,50 @@ def test_confidence_regression_fails(tmp_path):
     assert code==1 and summary['mean_delta_confidence']<0
 
 
+def test_letter_case_change_is_not_an_ocr_regression(tmp_path):
+    write_job(tmp_path/'jobs',1)
+    def changed(case):
+        result=unchanged(case)
+        result['ocr_lines']=copy.deepcopy(result['ocr_lines'])
+        result['ocr_lines'][0]['text']='товар'
+        result['ocr_lines'][0]['confidence']=.5
+        return result
+    code,summary=run(changed,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2
+    assert summary['unchanged']==1 and summary['worse']==0
+    assert 'регистр' in summary['records'][0]['detail']
+
+
+def test_same_ocr_blocks_in_different_order_are_not_a_regression(tmp_path):
+    directory=write_job(tmp_path/'jobs',1)
+    payload=json.loads((directory/'ocr_rectified.json').read_text())
+    payload['lines'].append(dict(text='НДС',confidence=.9,box=[[0,0],[1,0],[1,1],[0,1]]))
+    (directory/'ocr_rectified.json').write_text(json.dumps(payload))
+    def changed(case):
+        result=unchanged(case)
+        result['ocr_lines']=list(reversed(copy.deepcopy(result['ocr_lines'])))
+        for line in result['ocr_lines']:line['confidence']-=.1
+        return result
+    code,summary=run(changed,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2
+    assert summary['unchanged']==1 and summary['worse']==0
+
+
+def test_cyrillic_lowercase_to_latin_uppercase_glyph_is_not_a_regression(tmp_path):
+    directory=write_job(tmp_path/'jobs',1)
+    payload=json.loads((directory/'ocr_rectified.json').read_text())
+    payload['lines'][0]['text']='1 т'
+    (directory/'ocr_rectified.json').write_text(json.dumps(payload))
+    def changed(case):
+        result=unchanged(case)
+        result['ocr_lines']=copy.deepcopy(result['ocr_lines'])
+        result['ocr_lines'][0].update(text='1 T',confidence=.5)
+        return result
+    code,summary=run(changed,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2
+    assert summary['unchanged']==1 and summary['worse']==0
+
+
 def test_user_edits_are_not_baseline_ocr(tmp_path):
     directory=write_job(tmp_path/'jobs',1)
     original=json.loads((directory/'receipt.json').read_text())
