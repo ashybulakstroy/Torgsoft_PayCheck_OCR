@@ -53,6 +53,7 @@ def assess(case,candidate):
     from App.receipt_editing import parse_number,update_receipt
     from App.ocr_catalog_eval import classify_name
     before=case['receipt'];after=candidate['receipt']
+    tolerated=candidate.get('review_disposition')=='tolerated_unchanged'
     old=[r for r in before['rows'] if r['kind'] in {'product','service','tax'}]
     new=[r for r in after['rows'] if r['kind'] in {'product','service','tax'}]
     reasons=[];changes=[]
@@ -78,17 +79,19 @@ def assess(case,candidate):
     delta=len(new_lines)-len(old_lines)
     mean=lambda lines:sum(float(l['confidence']) for l in lines)/len(lines) if lines else 0
     confidence=mean(new_lines)-mean(old_lines)
-    if delta<0:reasons.append('меньше OCR-блоков: требуется подтверждение')
-    if confidence < -1e-6:reasons.append('снизилась средняя уверенность OCR')
-    if changes and not candidate.get('verified'):reasons.append('изменённые данные не подтверждены независимым эталоном')
+    if delta<0 and not tolerated:reasons.append('меньше OCR-блоков: требуется подтверждение')
+    if confidence < -1e-6 and not tolerated:reasons.append('снизилась средняя уверенность OCR')
+    tolerated=bool(changes) and tolerated
+    if changes and not candidate.get('verified') and not tolerated:
+        reasons.append('изменённые данные не подтверждены независимым эталоном')
     # A verified reference may approve corrected fields, but cannot override a
     # numeric regression or lost VAT/math check silently in this general runner.
-    return dict(status='worse' if reasons else 'better' if changes else 'unchanged',
+    return dict(status='worse' if reasons else 'unchanged' if tolerated else 'better' if changes else 'unchanged',
                 reasons=reasons,changes=changes,delta_lines=delta,delta_confidence=confidence,
                 detail=candidate.get('detail',''))
 
 
-def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report=False):
+def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report=False,start_index=1):
     out.mkdir(parents=True,exist_ok=True)
     summary=dict(requested=limit,files_tested=0,worse=0,better=0,unchanged=0,
                  mean_delta_lines=0,mean_delta_confidence=0,status='running',scope=scope,records=[])
@@ -112,12 +115,18 @@ def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report
     try:jobs=latest_jobs(root,limit)
     except (Exception,KeyboardInterrupt) as error:
         summary.update(status='failed',error=f'Не удалось выбрать историю: {type(error).__name__}: {error}');save();emit(summary['error']);visual_stop();return 1,summary
-    summary['available']=len(jobs);summary['coverage_complete']=len(jobs)==limit
-    emit(f'Веб-история: выбрано {len(jobs)}/{limit} завершённых чеков, от новых к старым.',flush=True)
+    total_available=len(jobs)
+    if start_index < 1 or start_index > total_available + 1:
+        raise ValueError(f'некорректный start_index={start_index}; доступно {total_available} чеков')
+    jobs=jobs[start_index-1:]
+    summary['available']=total_available;summary['start_index']=start_index
+    summary['coverage_complete']=start_index==1 and total_available==limit
+    emit(f'Веб-история: выбрано {len(jobs)} чеков, начиная с {start_index}-го из {total_available}/{limit} завершённых.',flush=True)
     # A fixed selection makes the run reproducible if new jobs arrive mid-test.
     summary['selected_jobs']=[j['id'] for j in jobs];save()
-    for index,job in enumerate(jobs,1):
-        emit(f'[{index}/{len(jobs)}] START {job["id"]} {job["filename"]}',flush=True)
+    for relative_index,job in enumerate(jobs,1):
+        index=start_index+relative_index-1
+        emit(f'[{index}/{total_available}] START {job["id"]} {job["filename"]}',flush=True)
         try:
             case=load_case(job);case['output']=out/job['id'];case['output'].mkdir(exist_ok=True)
             baseline=copy.deepcopy(case)
@@ -133,7 +142,7 @@ def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report
             result=dict(status='worse',reasons=[f'{type(error).__name__}: {error}'],changes=[],delta_lines=0,delta_confidence=0)
         record=dict(id=job['id'],filename=job['filename'],**result);summary['records'].append(record)
         reason='; '.join(result['reasons']) or result.get('detail') or result['status']
-        emit(f'[{index}/{len(jobs)}] {"FAIL" if result["status"]=="worse" else "PASS"} {job["id"]} '
+        emit(f'[{index}/{total_available}] {"FAIL" if result["status"]=="worse" else "PASS"} {job["id"]} '
              f'Δстрок={result["delta_lines"]:+d} Δуверенности={result["delta_confidence"]:+.4f} {reason}',flush=True)
         summary['status']='failed' if result['status']=='worse' else 'running';save()
         if result['status']=='worse':
@@ -164,13 +173,14 @@ def main(default_candidate=None,default_scope='segmentation'):
     parser.add_argument('--jobs',type=Path,default=ROOT/'web_outputs')
     parser.add_argument('--output',type=Path)
     parser.add_argument('--scope',choices=['segmentation','full_pipeline'],default=default_scope)
+    parser.add_argument('--start-index',type=int,default=1,help='начать с позиции в списке новых завершённых чеков (нумерация с 1)')
     parser.add_argument('--no-open-report',action='store_true',help='не открывать браузер (для запуска без UI)')
     args=parser.parse_args()
     module,name=args.candidate.split(':',1)
     candidate=getattr(importlib.import_module(module),name)
     from App.artifact_paths import OCR_REPORTS
     out=args.output or OCR_REPORTS/datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-    code,summary=run(candidate,args.jobs,out,scope=args.scope,open_report=not args.no_open_report)
+    code,summary=run(candidate,args.jobs,out,scope=args.scope,open_report=not args.no_open_report,start_index=args.start_index)
     print(f'Отчёт: {out/"summary.json"}',flush=True)
     raise SystemExit(code)
 

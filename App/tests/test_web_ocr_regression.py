@@ -74,6 +74,34 @@ def test_unverified_regrouping_is_failure(tmp_path):
     assert code==1 and 'эталоном' in ';'.join(summary['records'][0]['reasons'])
 
 
+def test_user_tolerated_name_change_is_unchanged(tmp_path):
+    write_job(tmp_path/'jobs',1)
+    def tolerated(case):
+        result=unchanged(case)
+        result['receipt']['rows'][0]['name_raw']='Незначительное изменение'
+        result['review_disposition']='tolerated_unchanged'
+        return result
+    code,summary=run(tolerated,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2 and summary['unchanged']==1 and summary['better']==0
+
+
+def test_user_tolerated_missing_non_data_ocr_block_is_unchanged(tmp_path):
+    write_job(tmp_path/'jobs',1)
+    def tolerated(case):
+        result=unchanged(case)
+        result['ocr_lines']=result['ocr_lines'][:-1]
+        result['review_disposition']='tolerated_unchanged'
+        return result
+    code,summary=run(tolerated,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2 and summary['unchanged']==1 and summary['worse']==0
+
+
+def test_start_index_skips_previous_jobs(tmp_path):
+    for index in range(3):write_job(tmp_path/'jobs',index)
+    code,summary=run(unchanged,tmp_path/'jobs',tmp_path/'out',limit=3,start_index=3,emit=quiet)
+    assert code==2 and summary['files_tested']==1 and summary['start_index']==3
+
+
 def test_verified_reference_can_approve_restored_row_count(tmp_path):
     write_job(tmp_path/'jobs',1)
     def changed(case):

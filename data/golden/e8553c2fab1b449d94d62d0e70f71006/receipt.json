@@ -1,0 +1,598 @@
+{
+  "schema_version": "torgsoft-review-1.0",
+  "filename": "image.png",
+  "job_id": "e8553c2fab1b449d94d62d0e70f71006",
+  "order_number": "2142738808",
+  "date": "27.10.2026",
+  "rows": [
+    {
+      "row": 2,
+      "item_number_raw": "1",
+      "y_range": [
+        73.5,
+        129.5
+      ],
+      "name_raw": "Грунтовка IDEAL/EURO 10 л",
+      "quantity_raw": "2",
+      "price_raw": "1430T",
+      "kind": "product",
+      "ocr_confidence": 0.8712050825357437,
+      "raw_lines": [
+        {
+          "text": "Грунтовка",
+          "confidence": 0.8678987443447113,
+          "box": [
+            [
+              75.0,
+              80.0
+            ],
+            [
+              194.0,
+              80.0
+            ],
+            [
+              194.0,
+              102.0
+            ],
+            [
+              75.0,
+              102.0
+            ]
+          ],
+          "box_original": [
+            [
+              68.56687927246094,
+              748.4382934570312
+            ],
+            [
+              187.9615020751953,
+              747.9296875
+            ],
+            [
+              188.50978088378906,
+              771.280517578125
+            ],
+            [
+              68.88525390625,
+              771.9639892578125
+            ]
+          ]
+        },
+        {
+          "text": "1430T",
+          "confidence": 0.8168780306975046,
+          "box": [
+            [
+              459.0,
+              88.0
+            ],
+            [
+              529.0,
+              87.0
+            ],
+            [
+              529.0,
+              110.0
+            ],
+            [
+              459.0,
+              111.0
+            ]
+          ],
+          "box_original": [
+            [
+              454.2215270996094,
+              756.599365234375
+            ],
+            [
+              524.4528198242188,
+              756.9691772460938
+            ],
+            [
+              525.70263671875,
+              779.9806518554688
+            ],
+            [
+              455.3450012207031,
+              780.1970825195312
+            ]
+          ]
+        },
+        {
+          "text": "2",
+          "confidence": 0.4861590266227722,
+          "box": [
+            [
+              403.0,
+              87.0
+            ],
+            [
+              420.0,
+              87.0
+            ],
+            [
+              420.0,
+              120.0
+            ],
+            [
+              403.0,
+              120.0
+            ]
+          ],
+          "box_original": [
+            [
+              397.95025634765625,
+              755.6757202148438
+            ],
+            [
+              415.0180358886719,
+              755.6446533203125
+            ],
+            [
+              416.54473876953125,
+              789.6334228515625
+            ],
+            [
+              399.43536376953125,
+              789.7216186523438
+            ]
+          ]
+        },
+        {
+          "text": "1",
+          "confidence": 0.4379957616329193,
+          "box": [
+            [
+              21.0,
+              92.0
+            ],
+            [
+              37.0,
+              92.0
+            ],
+            [
+              37.0,
+              116.0
+            ],
+            [
+              21.0,
+              116.0
+            ]
+          ],
+          "box_original": [
+            [
+              14.471117973327637,
+              761.5445556640625
+            ],
+            [
+              30.542091369628906,
+              761.4633178710938
+            ],
+            [
+              30.977750778198242,
+              787.1885986328125
+            ],
+            [
+              14.878533363342285,
+              787.2954711914062
+            ]
+          ]
+        },
+        {
+          "text": "IDEAL/EURO 10 л",
+          "confidence": 0.8745114207267761,
+          "box": [
+            [
+              75.0,
+              106.0
+            ],
+            [
+              280.0,
+              105.0
+            ],
+            [
+              280.0,
+              126.0
+            ],
+            [
+              75.0,
+              126.0
+            ]
+          ],
+          "box_original": [
+            [
+              68.96904754638672,
+              776.2413330078125
+            ],
+            [
+              275.06878662109375,
+              773.95361328125
+            ],
+            [
+              275.89129638671875,
+              796.1224365234375
+            ],
+            [
+              69.5075454711914,
+              797.6283569335938
+            ]
+          ]
+        }
+      ],
+      "name": "Грунтовка IDEAL/EURO 10 л",
+      "quantity": "2",
+      "price": "1430T",
+      "stage": "matched",
+      "match": {
+        "status": "exact_name",
+        "best": {
+          "name": "Грунтовка IDEAL/EURO 10 л",
+          "score": 100.0,
+          "raw_similarity": 100.0,
+          "missing_query_numbers": [],
+          "normalized": "гpyhtobka ideal euro 10 л",
+          "sources": [
+            {
+              "workbook": "Данные первый этаж.xlsx",
+              "sheet": "Page1",
+              "row": 5855,
+              "article": "8989"
+            }
+          ]
+        },
+        "gap": 14.5,
+        "top_matches": [
+          {
+            "name": "Грунтовка IDEAL/EURO 10 л",
+            "score": 100.0,
+            "raw_similarity": 100.0,
+            "missing_query_numbers": [],
+            "normalized": "гpyhtobka ideal euro 10 л",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 5855,
+                "article": "8989"
+              }
+            ]
+          },
+          {
+            "name": "DW-10-24 SET Шуруповерт аккумуляторный",
+            "score": 85.5,
+            "raw_similarity": 85.5,
+            "missing_query_numbers": [],
+            "normalized": "dw 10 24 set шypyпobept akkymyляtophый",
+            "sources": [
+              {
+                "workbook": "3- этаж остаток.xlsx",
+                "sheet": "Page1",
+                "row": 194,
+                "article": "9785062"
+              }
+            ]
+          },
+          {
+            "name": "Magnetta WQD 10-10-0.75L3 Погружной насос (фекальный)",
+            "score": 85.5,
+            "raw_similarity": 85.5,
+            "missing_query_numbers": [],
+            "normalized": "magnetta wqd 10 10 0.75l3 пoгpyжhoй hacoc фekaльhый",
+            "sources": [
+              {
+                "workbook": "3- этаж остаток.xlsx",
+                "sheet": "Page1",
+                "row": 628,
+                "article": "WQD10-10-0.75L3"
+              }
+            ]
+          },
+          {
+            "name": "SHIMGE Глубинный насос 3SPm2.5/10-0.37T",
+            "score": 85.5,
+            "raw_similarity": 85.5,
+            "missing_query_numbers": [],
+            "normalized": "shimge глyбиhhый hacoc 3spm2.5 10 0.37t",
+            "sources": [
+              {
+                "workbook": "3- этаж остаток.xlsx",
+                "sheet": "Page1",
+                "row": 881,
+                "article": "9754957"
+              },
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2010,
+                "article": "9754957"
+              }
+            ]
+          },
+          {
+            "name": "SHIMGE Глубинный насос 3SЕm2.5/10-0.37T",
+            "score": 85.5,
+            "raw_similarity": 85.5,
+            "missing_query_numbers": [],
+            "normalized": "shimge глyбиhhый hacoc 3sem2.5 10 0.37t",
+            "sources": [
+              {
+                "workbook": "3- этаж остаток.xlsx",
+                "sheet": "Page1",
+                "row": 889,
+                "article": "9786100"
+              },
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2014,
+                "article": "9786100"
+              }
+            ]
+          }
+        ]
+      },
+      "articles": [
+        "8989"
+      ],
+      "similarity": 100.0,
+      "needs_review": false,
+      "ocr_name_confidence_pct": 87.12,
+      "review_reason": "",
+      "name_confirmed": false,
+      "name_origin": "catalog",
+      "article": "8989",
+      "catalog_key": "гpyhtobka ideal euro 10 л",
+      "match_review_reason": "",
+      "needs_name_review": false,
+      "matching_applied": true,
+      "line_total": "2860.00",
+      "invalid_fields": []
+    },
+    {
+      "row": 3,
+      "item_number_raw": "2",
+      "y_range": [
+        129.5,
+        169.5
+      ],
+      "name_raw": "НДС 16 %",
+      "quantity_raw": "458",
+      "price_raw": "1 T",
+      "kind": "tax",
+      "ocr_confidence": 0.7841643624835544,
+      "raw_lines": [
+        {
+          "text": "1 T",
+          "confidence": 0.5494494885206223,
+          "box": [
+            [
+              493.0,
+              135.0
+            ],
+            [
+              531.0,
+              135.0
+            ],
+            [
+              531.0,
+              162.0
+            ],
+            [
+              493.0,
+              162.0
+            ]
+          ],
+          "box_original": [
+            [
+              490.8037414550781,
+              804.5924072265625
+            ],
+            [
+              529.075439453125,
+              804.95849609375
+            ],
+            [
+              530.5439453125,
+              831.9827880859375
+            ],
+            [
+              492.24688720703125,
+              832.2006225585938
+            ]
+          ]
+        },
+        {
+          "text": "458",
+          "confidence": 0.7499370574951172,
+          "box": [
+            [
+              376.0,
+              137.0
+            ],
+            [
+              417.0,
+              137.0
+            ],
+            [
+              417.0,
+              162.0
+            ],
+            [
+              376.0,
+              162.0
+            ]
+          ],
+          "box_original": [
+            [
+              373.0640563964844,
+              807.4473876953125
+            ],
+            [
+              414.3603820800781,
+              807.16357421875
+            ],
+            [
+              415.6527099609375,
+              832.9202880859375
+            ],
+            [
+              374.3321838378906,
+              833.3085327148438
+            ]
+          ]
+        },
+        {
+          "text": "НДС 16 %",
+          "confidence": 0.7841643624835544,
+          "box": [
+            [
+              73.0,
+              141.0
+            ],
+            [
+              190.0,
+              139.0
+            ],
+            [
+              191.0,
+              163.0
+            ],
+            [
+              74.0,
+              165.0
+            ]
+          ],
+          "box_original": [
+            [
+              68.0274429321289,
+              813.6852416992188
+            ],
+            [
+              185.80389404296875,
+              810.585205078125
+            ],
+            [
+              187.93702697753906,
+              836.0554809570312
+            ],
+            [
+              70.12287902832031,
+              839.3428955078125
+            ]
+          ]
+        },
+        {
+          "text": "2",
+          "confidence": 0.4932454824447632,
+          "box": [
+            [
+              20.0,
+              140.0
+            ],
+            [
+              38.0,
+              140.0
+            ],
+            [
+              37.0,
+              168.0
+            ],
+            [
+              19.0,
+              167.0
+            ]
+          ],
+          "box_original": [
+            [
+              14.599662780761719,
+              813.0546264648438
+            ],
+            [
+              32.73168182373047,
+              812.9055786132812
+            ],
+            [
+              32.98836898803711,
+              842.9266967773438
+            ],
+            [
+              14.794567108154297,
+              842.0363159179688
+            ]
+          ]
+        }
+      ],
+      "name": "НДС 16 %",
+      "quantity": "458",
+      "price": "1 T",
+      "stage": "matched",
+      "match": {
+        "status": "excluded_tax",
+        "best": null,
+        "top_matches": []
+      },
+      "articles": [],
+      "similarity": null,
+      "needs_review": false,
+      "ocr_name_confidence_pct": 78.42,
+      "review_reason": "",
+      "name_confirmed": false,
+      "name_origin": "ocr",
+      "article": "",
+      "catalog_key": "",
+      "match_review_reason": "",
+      "needs_name_review": false,
+      "line_total": "458.00",
+      "invalid_fields": [],
+      "vat_status": "match"
+    }
+  ],
+  "total_raw": "3 318,00 T",
+  "product_count": 1,
+  "review_count": 0,
+  "pass_similarity": 87.0,
+  "catalog_names": 27567,
+  "warnings": [],
+  "elapsed_ms": 13798,
+  "geometry_status": "detected",
+  "rectification_method": "contour_coons_patch",
+  "raw_text": "№\nТауардың атауы\nСаны\nБағасы\nГрунтовка\n2\n1\n1430T\nIDEAL/EURO 10 л\n458\n2\nНДС 16 %\n1 T\nКорытынды :\n3 318,00 T",
+  "downloads": {
+    "json": "/api/jobs/e8553c2fab1b449d94d62d0e70f71006/files/receipt.json",
+    "csv": "/api/jobs/e8553c2fab1b449d94d62d0e70f71006/files/receipt.csv",
+    "text": "/api/jobs/e8553c2fab1b449d94d62d0e70f71006/files/ocr_rectified.txt"
+  },
+  "revision": 0,
+  "audit_log": [],
+  "finalized": false,
+  "expected_total": "3 318,00 T",
+  "expected_total_source": "ocr",
+  "calculation": {
+    "status": "match",
+    "validation_status": "match",
+    "vat": {
+      "status": "match",
+      "taxable_base": "2860.00",
+      "actual_tax": "458.00",
+      "expected_tax": "458.00",
+      "difference": "0.00",
+      "rate_percent": "16",
+      "rate_source": "printed_label",
+      "rows": [
+        3
+      ],
+      "unrounded_tax": "457.60",
+      "rounding_quantum": "1"
+    },
+    "products_subtotal": "2860.00",
+    "services_subtotal": "0.00",
+    "tax_subtotal": "458.00",
+    "computed_total": "3318.00",
+    "expected_total": "3318.00",
+    "difference": "0.00",
+    "missing_rows": [],
+    "missing_original_total": false,
+    "rule": "sum(quantity × price), including separate VAT rows"
+  },
+  "can_finalize": true
+}

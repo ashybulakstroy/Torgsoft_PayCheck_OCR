@@ -171,6 +171,22 @@ def matches_reviewed_reference(case,receipt,reference_path=None):
     return False
 
 
+def reviewed_disposition(case, receipt, reference_path=None):
+    """Return a user's explicit disposition for this exact reviewed output."""
+    reference_path=reference_path or ROOT/'experiments/references/printed_grid_user_review.json'
+    if not reference_path.exists():return None
+    references=json.loads(reference_path.read_text(encoding='utf-8'))
+    actual=[list(row) for row in signature(receipt['rows'])]
+    for reference in references.get('receipts',{}).values():
+        if reference.get('reviewer')!='user' or actual!=reference['expected_rows']:continue
+        digests=reference.get('input_sha256',{})
+        if digests and all((case['job']['path']/filename).is_file() and
+                           hashlib.sha256((case['job']['path']/filename).read_bytes()).hexdigest()==digest
+                           for filename,digest in digests.items()):
+            return reference.get('disposition')
+    return None
+
+
 def web_candidate(case):
     directory=case['job']['path']
     metadata=json.loads((directory/'rectification.json').read_text(encoding='utf-8'))

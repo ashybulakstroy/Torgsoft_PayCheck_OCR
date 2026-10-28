@@ -41,6 +41,28 @@ def _fit(x, y, degree):
     return fit
 
 
+def _supported_top_right(points, top_left, estimated, origin, extent):
+    """Return a real top-rule vertex when the fitted right side overshoots it.
+
+    A stepped total cell can pull the fit of the right outer side to the right.
+    Only a contour vertex on the printed top rule may correct that extrapolation;
+    the other three body corners remain untouched.
+    """
+    physical = points * extent + origin
+    tl, tr = top_left, estimated
+    body_height = max(1., float(np.linalg.norm(physical[3] - tl)))
+    candidates = points[(physical[:, 0] > (tl[0] + tr[0]) / 2)
+                        & (physical[:, 1] <= min(tl[1], tr[1]) + max(12., body_height * .04))
+                        & (physical[:, 0] <= tr[0] + 8.)]
+    if not len(candidates):
+        return None
+    # A contour may contain header-cell intersections on the top line.  The
+    # true top-right table corner is the outermost (rightmost) supported one,
+    # not the point nearest to an estimate pulled by a lower footer step.
+    candidate = max(candidates, key=lambda point: float(point[0]))
+    return candidate if tr[0] - (candidate[0] * extent[0] + origin[0]) >= 16. else None
+
+
 def build_contour_map(polygon: np.ndarray, margin: int = 16, trust_top: bool = True) -> tuple[np.ndarray, np.ndarray, dict]:
     """Coons patch bounded by fitted top, body bottom and two side curves.
 
@@ -122,6 +144,17 @@ def build_contour_map(polygon: np.ndarray, margin: int = 16, trust_top: bool = T
             cy = top_curve(cx) if horizontal is None else curve(horizontal, cx)
         corners.append([cx, cy])
     tl, tr, br, bl = np.asarray(corners)
+    estimated_top_right = (tr * extent + origin).copy()
+    supported_top_right = _supported_top_right(pts, tl * extent + origin, estimated_top_right, origin, extent)
+    refinement = dict(applied=False)
+    right_top_shift = 0.
+    if supported_top_right is not None:
+        right_top_shift = float(supported_top_right[0] - tr[0])
+        tr[0] = supported_top_right[0]
+        tr[1] = top_curve(tr[0])
+        refinement = dict(applied=True, estimated=estimated_top_right.tolist(),
+                          supported=(supported_top_right * extent + origin).tolist(),
+                          shift_px=float(right_top_shift * extent[0]))
     physical = np.asarray(corners) * extent + origin
     width = max(16, int(round((np.linalg.norm(physical[1]-physical[0])
                               + np.linalg.norm(physical[2]-physical[3])) / 2)))
@@ -148,7 +181,10 @@ def build_contour_map(polygon: np.ndarray, margin: int = 16, trust_top: bool = T
         top = [tx, top_curve(tx)]
         bottom = [bx, curve(bottom_fit, bx)]
         left = [curve(side_fits[0], ly), ly]
-        right = [curve(side_fits[1], ry), ry]
+        # Anchor only the top end of the right side to the printed corner.
+        # The correction fades to zero at the body bottom, preserving the
+        # separately detected total-cell step and all lower geometry.
+        right = [curve(side_fits[1], ry) + right_top_shift * (1 - np.clip(ry, 0, 1)), ry]
         values = []
         for axis in range(2):
             bilinear = ((1-u)*(1-v)*tl[axis] + u*(1-v)*tr[axis]
@@ -181,7 +217,8 @@ def build_contour_map(polygon: np.ndarray, margin: int = 16, trust_top: bool = T
                     fitted_top=top_fit.tolist(), fitted_bottom=bottom_fit.tolist(),
                     top_knots=np.column_stack([top_x, top_y]).tolist(), trusted_top=trust_top,
                     fitted_left=side_fits[0].tolist(), fitted_right=side_fits[1].tolist(),
-                    normalization_origin=origin.tolist(), normalization_extent=extent.tolist())
+                    normalization_origin=origin.tolist(), normalization_extent=extent.tolist(),
+                    top_right_refinement=refinement)
     return map_x, map_y, metadata
 
 

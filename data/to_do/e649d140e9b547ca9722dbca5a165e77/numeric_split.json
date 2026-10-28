@@ -1,0 +1,8 @@
+[
+  {
+    "row": 1,
+    "candidates": 0,
+    "applied": false,
+    "reason": "ambiguous_or_no_cross_column_block"
+  }
+]

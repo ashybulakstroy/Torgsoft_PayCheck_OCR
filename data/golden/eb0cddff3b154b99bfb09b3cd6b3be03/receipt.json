@@ -1,0 +1,634 @@
+{
+  "schema_version": "torgsoft-review-1.0",
+  "filename": "image.png",
+  "job_id": "eb0cddff3b154b99bfb09b3cd6b3be03",
+  "order_number": "2142738686",
+  "date": "27.10.2026",
+  "rows": [
+    {
+      "row": 2,
+      "item_number_raw": "1",
+      "y_range": [
+        108.94654104349004,
+        216.8514613495583
+      ],
+      "name_raw": "Алкидная Эмаль ПФ-115 Белый 20 л ELEGANT (00158)",
+      "quantity_raw": "2",
+      "price_raw": "16800 т",
+      "kind": "product",
+      "ocr_confidence": 0.9176440999463753,
+      "raw_lines": [
+        {
+          "text": "Алкидная Эмаль",
+          "confidence": 0.9197040478388468,
+          "box": [
+            [
+              102.0,
+              115.0
+            ],
+            [
+              339.0,
+              116.0
+            ],
+            [
+              339.0,
+              142.0
+            ],
+            [
+              102.0,
+              141.0
+            ]
+          ],
+          "box_original": [
+            [
+              138.73855590820312,
+              690.3846435546875
+            ],
+            [
+              374.259033203125,
+              701.1619262695312
+            ],
+            [
+              374.10980224609375,
+              726.3435668945312
+            ],
+            [
+              137.7984619140625,
+              716.5438232421875
+            ]
+          ]
+        },
+        {
+          "text": "1",
+          "confidence": 0.4952772557735443,
+          "box": [
+            [
+              35.0,
+              151.0
+            ],
+            [
+              49.0,
+              151.0
+            ],
+            [
+              49.0,
+              171.0
+            ],
+            [
+              35.0,
+              171.0
+            ]
+          ],
+          "box_original": [
+            [
+              70.51667785644531,
+              722.2367553710938
+            ],
+            [
+              84.51155853271484,
+              723.075927734375
+            ],
+            [
+              83.90313720703125,
+              743.5148315429688
+            ],
+            [
+              69.89875793457031,
+              742.724853515625
+            ]
+          ]
+        },
+        {
+          "text": "2",
+          "confidence": 0.4997536540031433,
+          "box": [
+            [
+              505.0,
+              147.0
+            ],
+            [
+              525.0,
+              147.0
+            ],
+            [
+              525.0,
+              176.0
+            ],
+            [
+              505.0,
+              176.0
+            ]
+          ],
+          "box_original": [
+            [
+              539.821533203125,
+              726.2044677734375
+            ],
+            [
+              559.8056030273438,
+              725.3345947265625
+            ],
+            [
+              560.091064453125,
+              754.5958251953125
+            ],
+            [
+              540.0596923828125,
+              755.30810546875
+            ]
+          ]
+        },
+        {
+          "text": "16800 т",
+          "confidence": 0.8559169843792915,
+          "box": [
+            [
+              566.0,
+              150.0
+            ],
+            [
+              679.0,
+              150.0
+            ],
+            [
+              679.0,
+              173.0
+            ],
+            [
+              566.0,
+              173.0
+            ]
+          ],
+          "box_original": [
+            [
+              600.80859375,
+              726.5955810546875
+            ],
+            [
+              713.7557373046875,
+              722.019287109375
+            ],
+            [
+              714.0250244140625,
+              746.1514892578125
+            ],
+            [
+              601.0491943359375,
+              750.0574951171875
+            ]
+          ]
+        },
+        {
+          "text": "ПФ-115 Белый 20 л",
+          "confidence": 0.9191361135906644,
+          "box": [
+            [
+              101.0,
+              149.0
+            ],
+            [
+              373.0,
+              150.0
+            ],
+            [
+              373.0,
+              174.0
+            ],
+            [
+              101.0,
+              174.0
+            ]
+          ],
+          "box_original": [
+            [
+              136.54647827148438,
+              724.5296020507812
+            ],
+            [
+              407.99346923828125,
+              733.6259155273438
+            ],
+            [
+              407.9164733886719,
+              756.9725341796875
+            ],
+            [
+              135.83810424804688,
+              749.721923828125
+            ]
+          ]
+        },
+        {
+          "text": "ELEGANT (00158)",
+          "confidence": 0.9140921384096146,
+          "box": [
+            [
+              101.0,
+              184.0
+            ],
+            [
+              370.0,
+              185.0
+            ],
+            [
+              370.0,
+              212.0
+            ],
+            [
+              101.0,
+              211.0
+            ]
+          ],
+          "box_original": [
+            [
+              135.5765380859375,
+              759.8033447265625
+            ],
+            [
+              404.8844299316406,
+              767.71240234375
+            ],
+            [
+              404.8721618652344,
+              793.9630126953125
+            ],
+            [
+              134.8541259765625,
+              787.0307006835938
+            ]
+          ]
+        }
+      ],
+      "name": "Алкидная Эмаль ПФ-115 Белый 20 л ELEGANT ( 00158 )",
+      "quantity": "2",
+      "price": "16800 т",
+      "stage": "matched",
+      "match": {
+        "status": "exact_name",
+        "best": {
+          "name": "Алкидная Эмаль ПФ-115 Белый 20 л ELEGANT ( 00158 )",
+          "score": 100.0,
+          "raw_similarity": 100.0,
+          "missing_query_numbers": [],
+          "normalized": "aлkидhaя эmaль пф 115 бeлый 20 л elegant 00158",
+          "sources": [
+            {
+              "workbook": "Данные первый этаж.xlsx",
+              "sheet": "Page1",
+              "row": 2846,
+              "article": "9786842"
+            }
+          ]
+        },
+        "gap": 12.15,
+        "top_matches": [
+          {
+            "name": "Алкидная Эмаль ПФ-115 Белый 20 л ELEGANT ( 00158 )",
+            "score": 100.0,
+            "raw_similarity": 100.0,
+            "missing_query_numbers": [],
+            "normalized": "aлkидhaя эmaль пф 115 бeлый 20 л elegant 00158",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2846,
+                "article": "9786842"
+              }
+            ]
+          },
+          {
+            "name": "Алкидная Эмаль ПФ-115 Желтый 20 л ELEGANT (00163)",
+            "score": 87.85,
+            "raw_similarity": 92.47,
+            "missing_query_numbers": [
+              "158"
+            ],
+            "normalized": "aлkидhaя эmaль пф 115 жeлtый 20 л elegant 00163",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2847,
+                "article": "9787265"
+              }
+            ]
+          },
+          {
+            "name": "Алкидная Эмаль ПФ-115 Красный 20 л ELEGANT (00153)",
+            "score": 84.89,
+            "raw_similarity": 89.36,
+            "missing_query_numbers": [
+              "158"
+            ],
+            "normalized": "aлkидhaя эmaль пф 115 kpachый 20 л elegant 00153",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2848,
+                "article": "9787266"
+              }
+            ]
+          },
+          {
+            "name": "Алкидная Эмаль ПФ-115 Синий 20 л ELEGANT ( 00165 )",
+            "score": 84.67,
+            "raw_similarity": 89.13,
+            "missing_query_numbers": [
+              "158"
+            ],
+            "normalized": "aлkидhaя эmaль пф 115 cиhий 20 л elegant 00165",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2850,
+                "article": "9786915"
+              }
+            ]
+          },
+          {
+            "name": "Алкидная Эмаль ПФ-115 Серый  20 л ELEGANT (52752)",
+            "score": 82.61,
+            "raw_similarity": 86.96,
+            "missing_query_numbers": [
+              "158"
+            ],
+            "normalized": "aлkидhaя эmaль пф 115 cepый 20 л elegant 52752",
+            "sources": [
+              {
+                "workbook": "Данные первый этаж.xlsx",
+                "sheet": "Page1",
+                "row": 2849,
+                "article": "9787122"
+              }
+            ]
+          }
+        ]
+      },
+      "articles": [
+        "9786842"
+      ],
+      "similarity": 100.0,
+      "needs_review": false,
+      "ocr_name_confidence_pct": 91.76,
+      "review_reason": "",
+      "name_confirmed": false,
+      "name_origin": "catalog",
+      "article": "9786842",
+      "catalog_key": "aлkидhaя эmaль пф 115 бeлый 20 л elegant 00158",
+      "match_review_reason": "",
+      "needs_name_review": false,
+      "matching_applied": true,
+      "line_total": "33600.00",
+      "invalid_fields": []
+    },
+    {
+      "row": 3,
+      "item_number_raw": "2",
+      "y_range": [
+        216.8514613495583,
+        273.3363543264977
+      ],
+      "name_raw": "НДС 16 %",
+      "quantity_raw": "5376",
+      "price_raw": "1 т",
+      "kind": "tax",
+      "ocr_confidence": 0.8090765409999423,
+      "raw_lines": [
+        {
+          "text": "5376",
+          "confidence": 0.7999008893966675,
+          "box": [
+            [
+              456.0,
+              231.0
+            ],
+            [
+              525.0,
+              231.0
+            ],
+            [
+              525.0,
+              258.0
+            ],
+            [
+              456.0,
+              258.0
+            ]
+          ],
+          "box_original": [
+            [
+              491.4501953125,
+              811.3453979492188
+            ],
+            [
+              560.8153686523438,
+              810.007080078125
+            ],
+            [
+              561.0911254882812,
+              837.0863647460938
+            ],
+            [
+              491.8231506347656,
+              837.9461669921875
+            ]
+          ]
+        },
+        {
+          "text": "1 т",
+          "confidence": 0.5414896011352539,
+          "box": [
+            [
+              632.0,
+              229.0
+            ],
+            [
+              683.0,
+              229.0
+            ],
+            [
+              683.0,
+              260.0
+            ],
+            [
+              632.0,
+              260.0
+            ]
+          ],
+          "box_original": [
+            [
+              667.8599853515625,
+              805.7454833984375
+            ],
+            [
+              718.8889770507812,
+              804.7904052734375
+            ],
+            [
+              719.6106567382812,
+              837.2091674804688
+            ],
+            [
+              668.4483642578125,
+              837.78466796875
+            ]
+          ]
+        },
+        {
+          "text": "НДС 16 %",
+          "confidence": 0.8090765409999423,
+          "box": [
+            [
+              101.0,
+              233.0
+            ],
+            [
+              245.0,
+              231.0
+            ],
+            [
+              245.0,
+              260.0
+            ],
+            [
+              101.0,
+              262.0
+            ]
+          ],
+          "box_original": [
+            [
+              134.17918395996094,
+              809.328125
+            ],
+            [
+              279.15191650390625,
+              811.8327026367188
+            ],
+            [
+              278.77728271484375,
+              840.151611328125
+            ],
+            [
+              133.1384735107422,
+              838.781982421875
+            ]
+          ]
+        },
+        {
+          "text": "2",
+          "confidence": 0.49616101384162903,
+          "box": [
+            [
+              31.0,
+              231.0
+            ],
+            [
+              54.0,
+              231.0
+            ],
+            [
+              54.0,
+              266.0
+            ],
+            [
+              31.0,
+              266.0
+            ]
+          ],
+          "box_original": [
+            [
+              63.62671661376953,
+              804.20654296875
+            ],
+            [
+              86.8343505859375,
+              805.2251586914062
+            ],
+            [
+              85.71285247802734,
+              841.3597412109375
+            ],
+            [
+              62.59455108642578,
+              840.6162109375
+            ]
+          ]
+        }
+      ],
+      "name": "НДС 16 %",
+      "quantity": "5376",
+      "price": "1 т",
+      "stage": "matched",
+      "match": {
+        "status": "excluded_tax",
+        "best": null,
+        "top_matches": []
+      },
+      "articles": [],
+      "similarity": null,
+      "needs_review": false,
+      "ocr_name_confidence_pct": 80.91,
+      "review_reason": "",
+      "name_confirmed": false,
+      "name_origin": "ocr",
+      "article": "",
+      "catalog_key": "",
+      "match_review_reason": "",
+      "needs_name_review": false,
+      "line_total": "5376.00",
+      "invalid_fields": [],
+      "vat_status": "match"
+    }
+  ],
+  "total_raw": "38 976,00 т",
+  "product_count": 1,
+  "review_count": 0,
+  "pass_similarity": 87.0,
+  "catalog_names": 27567,
+  "warnings": [],
+  "elapsed_ms": 10734,
+  "geometry_status": "detected",
+  "rectification_method": "wave_grid",
+  "raw_text": "N\nТауардың атауы\nСаны\nБағасы\nАлкидная Эмаль\nПФ-115 Белый 20 л\n2\n1\n16800 т\nELEGANT (00158)\n2\n5376\nНДС 16 %\n1 т\nҚорытынды :\n38 976,00 т",
+  "downloads": {
+    "json": "/api/jobs/eb0cddff3b154b99bfb09b3cd6b3be03/files/receipt.json",
+    "csv": "/api/jobs/eb0cddff3b154b99bfb09b3cd6b3be03/files/receipt.csv",
+    "text": "/api/jobs/eb0cddff3b154b99bfb09b3cd6b3be03/files/ocr_rectified.txt"
+  },
+  "revision": 0,
+  "audit_log": [],
+  "finalized": false,
+  "expected_total": "38 976,00 т",
+  "expected_total_source": "ocr",
+  "calculation": {
+    "status": "match",
+    "validation_status": "match",
+    "vat": {
+      "status": "match",
+      "taxable_base": "33600.00",
+      "actual_tax": "5376.00",
+      "expected_tax": "5376.00",
+      "difference": "0.00",
+      "rate_percent": "16",
+      "rate_source": "printed_label",
+      "rows": [
+        3
+      ],
+      "unrounded_tax": "5376.00",
+      "rounding_quantum": "1"
+    },
+    "products_subtotal": "33600.00",
+    "services_subtotal": "0.00",
+    "tax_subtotal": "5376.00",
+    "computed_total": "38976.00",
+    "expected_total": "38976.00",
+    "difference": "0.00",
+    "missing_rows": [],
+    "missing_original_total": false,
+    "rule": "sum(quantity × price), including separate VAT rows"
+  },
+  "can_finalize": true
+}

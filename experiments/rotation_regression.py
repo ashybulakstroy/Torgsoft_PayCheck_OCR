@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from App.receipt_editing import parse_number
-from experiments.guarded_printed_grid import matches_reviewed_reference
+from experiments.guarded_printed_grid import matches_reviewed_reference, reviewed_disposition
 from experiments.web_ocr_regression import current_pipeline, main
 
 REFERENCE = Path(__file__).with_name("references") / "rotation_geometry_user_review.json"
@@ -46,10 +46,13 @@ def _matches_review(case, result):
 def web_candidate(case):
     result = current_pipeline(case)
     verified, detail = _matches_review(case, result)
+    disposition = reviewed_disposition(case, result["receipt"])
     if not verified and matches_reviewed_reference(case, result["receipt"]):
         verified = True
         detail = "результат совпал с ранее подтверждённым пользователем эталоном таблицы"
-    result.update(verified=verified, detail=detail)
+    if disposition == "tolerated_unchanged":
+        detail = "небольшое изменение текста принято пользователем как отсутствие изменения"
+    result.update(verified=verified, review_disposition=disposition, detail=detail)
     return result
 
 

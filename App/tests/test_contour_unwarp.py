@@ -43,3 +43,28 @@ def test_missing_top_left_corner_uses_stable_extrapolation():
     assert metadata["source_body_corners"][0][1] < 510
     assert metadata["body_size"][1] > 150
     assert metadata["footer_height"] < 50
+
+
+def test_supported_top_right_overrides_footer_pulled_side_fit():
+    # The first point is the genuine printed top-right corner. The stepped
+    # lower total cell pulls a plain outer-side fit 51 pixels too far right.
+    polygon = np.array([[511, 370], [59, 377], [58, 883], [63, 944],
+                        [203, 936], [202, 928], [188, 924], [110, 933],
+                        [76, 930], [75, 921], [367, 904], [370, 934],
+                        [562, 921]], np.float32)
+    _, _, metadata = build_contour_map(polygon)
+    refinement = metadata["top_right_refinement"]
+    assert refinement["applied"]
+    assert refinement["supported"] == [511.0, 370.0]
+    assert refinement["shift_px"] < -45
+    assert metadata["footer_height"] > 0
+
+
+def test_inner_header_intersection_cannot_replace_true_top_right_corner():
+    # 457/447 are internal header intersections; 534 is the outer corner.
+    # The table is already correctly rectangular and must stay untouched.
+    polygon = np.array([[534, 372], [457, 373], [447, 376], [122, 394],
+                        [139, 631], [322, 620], [324, 641], [350, 642],
+                        [550, 628]], np.float32)
+    _, _, metadata = build_contour_map(polygon)
+    assert not metadata["top_right_refinement"]["applied"]
