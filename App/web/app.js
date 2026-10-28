@@ -322,6 +322,7 @@ async function saveEditedRow(){
   await sendEdit(payload);
 }
 function reset(){
+  window.OcrActivity?.finish(false);
   renderMath.previousStatus=null;clearTimeout(showMathSuccess.timer);document.querySelector('.math-success-flash')?.remove();
   stopTransferFlow();
   document.querySelectorAll('.receipt-transfer').forEach(card=>card.remove());
@@ -333,12 +334,14 @@ function reset(){
   document.querySelectorAll('[data-step]').forEach(step=>step.classList.remove('active','complete'));setProgress(0);setPill('Обработка','processing');
 }
 function showError(message){
+  window.OcrActivity?.finish(false);
   stopTransferFlow();
   state.stream?.close();$('process-card').classList.remove('busy');$('error-card').hidden=false;$('error-text').textContent=message;$('process-title').textContent='Обработка остановлена';$('process-subtitle').textContent='Исходное фото сохранено';setPill('Нужна проверка','error');logEvent(message);
   document.querySelectorAll('.image-card').forEach(card=>card.classList.remove('active-operation'));
 }
 function finish(result){
   if(!result)return;
+  window.OcrActivity?.finish(true);
   stopTransferFlow();
   if(!state.result)focusRow(null,true);
   state.result=result;state.stream?.close();state.stream=null;state.rows=new Map(result.rows.map(row=>[row.row,row]));renderRows();
@@ -355,16 +358,17 @@ function finish(result){
 }
 function consume(event){
   if(event.progress!==undefined)setProgress(event.progress);
-  if(event.type==='phase'){setPhase(event.phase,event.title);logEvent(event.title);}
+  if(event.type==='phase'){setPhase(event.phase==='layout'&&event.progress<50?'geometry':event.phase,event.title);window.OcrActivity?.phase(event.phase,event.title);logEvent(event.title);}
   else if(event.type==='artifact'){addArtifact(event.artifact);logEvent(event.artifact.title);}
   else if(event.type==='contour'){const asset=state.assets.get(event.target);if(asset){asset.contour=event.polygon;drawAsset(asset);}logEvent(event.title);}
   else if(event.type==='region'){const asset=state.assets.get(event.target);if(asset){asset.region=event.box;drawAsset(asset);}}
   else if(event.type==='boxes'){const asset=state.assets.get(event.target);if(asset){asset.boxes=event.boxes;asset.cells=null;drawAsset(asset);}logEvent(`${event.title}: ${event.boxes.length}`);}
   else if(event.type==='cells'){const asset=state.assets.get(event.target);if(asset){asset.cells=event.cells;drawAsset(asset);}logEvent(`${event.title} · ${event.cells.length} ячеек`);}
   else if(event.type==='header'){$('receipt-area').hidden=false;$('order-number').textContent=event.order_number?'№ '+event.order_number:'';$('receipt-date').textContent=event.date||'Дата не прочитана';}
-  else if(event.type==='draft_rows'){if(event.pass_similarity!==undefined)state.passSimilarity=event.pass_similarity;state.rows=new Map(event.rows.map(row=>[row.row,row]));renderRows();$('receipt-meta').textContent='Черновик из OCR · названия ещё не сверены';}
-  else if(event.type==='row'){state.rows.set(event.row.row,event.row);renderRows();focusRow(event.row.row);$('process-subtitle').textContent=event.title;logEvent(event.title);}
-  else if(event.type==='message')logEvent(event.title);
+  else if(event.type==='draft_rows'){window.OcrActivity?.rows(event.rows);if(event.pass_similarity!==undefined)state.passSimilarity=event.pass_similarity;state.rows=new Map(event.rows.map(row=>[row.row,row]));renderRows();$('receipt-meta').textContent='Черновик из OCR · названия ещё не сверены';}
+  else if(event.type==='row'){state.rows.set(event.row.row,event.row);renderRows();focusRow(event.row.row);logEvent(event.title);}
+  else if(event.type==='message'){window.OcrActivity?.message(event.title);$('process-subtitle').textContent=event.title;logEvent(event.title);}
+  else if(event.type==='ui_status'){window.OcrActivity?.uiStatus(event);$('process-subtitle').textContent=event.title;if(event.rows_total||event.matched_products!==undefined)logEvent(window.OcrActivity ? document.getElementById('ocr-activity-details').textContent : event.title);}
   else if(event.type==='complete'){finish(event.result);logEvent('Обработка завершена');}
   else if(event.type==='error')showError(event.title);
   if(event.type!=='complete'&&event.type!=='error')followProcessing();
@@ -372,9 +376,12 @@ function consume(event){
 }
 function listen(jobId, token){
   state.stream=new EventSource(`/api/jobs/${jobId}/events`);
-  state.stream.addEventListener('pipeline',event=>{if(token!==state.token)return;try{consume(JSON.parse(event.data));}catch(error){console.error(error);toast('Не удалось отобразить обновление. Обновите страницу.');}});
+  state.stream.onopen=()=>{if(token===state.token)window.OcrActivity?.heartbeat();};
+  state.stream.addEventListener('heartbeat',()=>{if(token===state.token)window.OcrActivity?.heartbeat();});
+  state.stream.addEventListener('pipeline',event=>{if(token!==state.token)return;window.OcrActivity?.heartbeat();try{consume(JSON.parse(event.data));}catch(error){console.error(error);toast('Не удалось отобразить обновление. Обновите страницу.');}});
   state.stream.onerror=async()=>{
     if(token!==state.token)return;
+    window.OcrActivity?.connectionLost();
     try{const response=await fetch(`/api/jobs/${jobId}`);if(!response.ok)throw Error();const job=await response.json();if(job.status==='done')finish(job.result);else if(job.status==='failed')showError(job.error);else $('process-subtitle').textContent='Восстанавливаем связь с обработкой…';}catch{ $('process-subtitle').textContent='Нет связи с сервером. Ожидаем подключения…'; }
   };
 }
@@ -382,7 +389,7 @@ async function upload(file){
   if(!file)return;
   if(file.size>state.maxUpload){toast(`Максимальный размер фото — ${Math.floor(state.maxUpload/1024/1024)} МБ`);return;}
   if(file.type&&!['image/jpeg','image/png','image/webp'].includes(file.type)){toast('Выберите фотографию JPG, PNG или WEBP');return;}
-  reset();const token=state.token;$('drop-zone').hidden=true;$('input-note').hidden=false;state.blob=URL.createObjectURL(file);
+  reset();window.OcrActivity?.start();const token=state.token;$('drop-zone').hidden=true;$('input-note').hidden=false;state.blob=URL.createObjectURL(file);
   logEvent('Начало обработки: '+file.name);
   const preview=new Image();preview.src=state.blob;preview.onload=()=>{if(token===state.token&&!state.assets.has('original'))addArtifact({key:'original',role:'original',title:'Исходное фото',subtitle:file.name,url:preview.src,width:preview.naturalWidth,height:preview.naturalHeight});};
   $('process-title').textContent='Загружаем фотографию';$('process-subtitle').textContent=file.name;
@@ -405,7 +412,7 @@ async function restore(){
       logEvent('Восстановлен сохранённый результат: '+job.filename);
       const layoutResponse=await fetch(`/api/jobs/${id}/files/layout.json`);
       if(layoutResponse.ok&&token===state.token){const data=await layoutResponse.json();const asset=state.assets.get('rectified');if(asset){asset.cells=data.cells;drawAsset(asset);}}
-    }else if(job.status==='failed')showError(job.error);else{$('process-card').classList.add('busy');setPill('Обработка','processing');listen(id,token);}
+    }else if(job.status==='failed')showError(job.error);else{window.OcrActivity?.start();$('process-card').classList.add('busy');setPill('Обработка','processing');listen(id,token);}
   }catch{}
 }
 document.querySelector('.app-header').addEventListener('click',event=>{
@@ -441,3 +448,4 @@ $('accept-match').addEventListener('click',()=>{const row=state.rows.get(state.e
 $('save-total').addEventListener('click',()=>sendEdit({expected_total:$('edit-expected-total').value}));
 $('finalize-receipt').addEventListener('click',()=>sendEdit({finalize:true}));
 fetch('/api/health').then(response=>{if(!response.ok)throw Error();return response.json();}).then(config=>{state.maxUpload=config.max_upload_bytes;$('upload-limit').textContent=Math.floor(state.maxUpload/1024/1024);$('connection-text').textContent='Сервер доступен';restore();}).catch(()=>{$('connection-dot').style.background='#dba55a';$('connection-text').textContent='Нет связи с сервером';});
+

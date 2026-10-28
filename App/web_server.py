@@ -166,7 +166,7 @@ def create_server(host="0.0.0.0", port=8023, output_dir=None, processor=None, ma
         def do_GET(self):
             parts = urlparse(self.path)
             path = unquote(parts.path)
-            if path in {"/", "/index.html", "/app.js", "/styles.css", "/editing.css"}:
+            if path in {"/", "/index.html", "/app.js", "/styles.css", "/editing.css", "/ocr_activity.js", "/ocr_activity.css"}:
                 filename = "index.html" if path == "/" else path.lstrip("/")
                 mime = {"html":"text/html", "js":"text/javascript", "css":"text/css"}[filename.split(".")[-1]]
                 return self.send_data((STATIC / filename).read_bytes(), mime+"; charset=utf-8")
@@ -220,7 +220,7 @@ def create_server(host="0.0.0.0", port=8023, output_dir=None, processor=None, ma
                         payload = json.dumps(event, ensure_ascii=False)
                         self.wfile.write(f'id: {event["id"]}\nevent: pipeline\ndata: {payload}\n\n'.encode())
                         after = event["id"]
-                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.write(b"event: heartbeat\ndata: {}\n\n")
                     self.wfile.flush()
                     if terminal and after >= len(job.events):
                         break
@@ -302,3 +302,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

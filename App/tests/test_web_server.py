@@ -38,9 +38,11 @@ def test_http_upload_sse_and_download(server):
         job_id = json.load(response)["id"]
     with urllib.request.urlopen(base+f"/api/jobs/{job_id}/events") as response:
         content = response.read().decode()
-    events = [json.loads(line[6:]) for line in content.splitlines() if line.startswith("data: ")]
+    payloads = [json.loads(line[6:]) for line in content.splitlines() if line.startswith("data: ")]
+    events = [payload for payload in payloads if "type" in payload]
     assert any(event["type"] == "artifact" for event in events)
     assert events[-1]["type"] == "complete"
+    assert "event: heartbeat\ndata: {}" in content
     assert events[-1]["progress"] == 100
     assert [event["id"] for event in events] == sorted({event["id"] for event in events})
     with urllib.request.urlopen(base+f"/api/jobs/{job_id}") as response:

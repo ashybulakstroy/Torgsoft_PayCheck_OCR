@@ -19,8 +19,9 @@ debug_notes/
 data/in_data/
 models/
 
-# Experiments (local only, not published to GitHub)
+# Experiments and dev playgrounds (local only, not published to GitHub)
 experiments/
+web_activity/
 
 # Backup archives and editor/system files
 *.zip

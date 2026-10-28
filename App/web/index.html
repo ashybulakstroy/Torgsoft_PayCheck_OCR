@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#f5f7fb">
   <title>Ашыбулак строй · подготовка счёта на оплату</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/ocr_activity.css">
   <link rel="stylesheet" href="/editing.css">
+  <script src="/ocr_activity.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -51,7 +53,13 @@
       <div class="process-card" id="process-card">
         <div class="process-top"><span class="process-icon"><svg><use href="#i-grid"/></svg></span><div><strong id="process-title">Готовы к работе</strong><p id="process-subtitle">Загрузите фото — остальное сделаем мы</p></div><span id="progress-label">0%</span></div>
         <div class="progress-track" role="progressbar" aria-label="Обработка фотографии" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-fill"></div></div>
-        <ol class="steps" aria-label="Этапы обработки"><li data-step="geometry"><span>1</span>Геометрия</li><li data-step="ocr"><span>2</span>OCR</li><li data-step="layout"><span>3</span>Ячейки</li><li data-step="matching"><span>4</span>Справочник</li></ol>
+        <section id="ocr-activity" class="ocr-live" aria-label="Текущая операция" hidden>
+          <div class="ocr-live-header"><span class="ocr-live-indicator" id="ocr-activity-dot" aria-hidden="true"></span><span id="ocr-activity-action">Начинаем обработку</span></div>
+          <p id="ocr-activity-details"></p>
+          <div class="ocr-live-meta"><span id="ocr-activity-elapsed">Прошло 0 с</span><span id="ocr-activity-last">Последнее действие сейчас</span><span id="ocr-activity-connection">Проверяем связь</span></div>
+          <p id="ocr-activity-idle" hidden></p>
+        </section>
+        <ol class="steps" aria-label="Этапы обработки"><li data-step="geometry"><span>1</span>Геометрия</li><li data-step="ocr"><span>2</span>Товары</li><li data-step="layout"><span>3</span>Цены и НДС</li><li data-step="matching"><span>4</span>Справочник</li></ol>
       </div>
 
       <details class="activity debug-only" id="activity" hidden open><summary><span class="live-dot"></span>Логи обработки <span id="event-count">0 событий</span></summary><ol id="event-log"></ol></details>
@@ -105,3 +113,4 @@
 <div id="toast" class="toast" role="status" hidden></div>
 <dialog id="image-dialog"><div class="dialog-header"><strong id="dialog-title">Изображение</strong><button id="close-dialog" class="icon-button" type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div><div id="dialog-image"></div></dialog>
 </body></html>
+

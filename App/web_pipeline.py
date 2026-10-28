@@ -15,6 +15,7 @@ from PIL import Image, ImageOps
 from rapidocr_onnxruntime import RapidOCR
 from rapidfuzz import fuzz, process
 
+from experiments.ocr_activity import preliminary_row_count, completed_text_rows, row_totals, emit_status
 from App.receipt_rectification import rectify_table
 from experiments.receipt_orientation_detector import orient_receipt
 from App.rotation_rectification import rotate_table_crop
@@ -139,7 +140,7 @@ class ReceiptPipeline:
         if self.engine is None:
             self.engine = RapidOCR(rec_model_path=str(MODEL), rec_img_shape=[3, 48, 320], text_score=.3)
 
-    def recognize(self, path, job, target, progress, on_partial=None):
+    def recognize(self, path, job, target, progress, on_partial=None, row_boundaries=None):
         with self.ocr_lock:
             detector, recognizer = self.engine.text_detector, self.engine.text_recognizer
 
@@ -168,7 +169,15 @@ class ReceiptPipeline:
                                        for box, (text, confidence) in zip(detected, results)
                                        if confidence >= self.engine.text_score]
                             on_partial(partial)
-                            job.publish("message", title=f"Прочитано блоков: {len(results)} из {len(images)}", progress=progress+int(6*len(results)/len(images)))
+                            rows_done, rows_total = completed_text_rows(detected, len(results), row_boundaries) if row_boundaries is not None else (0, 0)
+                            if rows_total:
+                                emit_status(job, "ocr", "Распознаём товары, количество и цены",
+                                            rows_done=rows_done, rows_total=rows_total,
+                                            progress=progress+int(6*len(results)/len(images)))
+                            else:
+                                emit_status(job, "ocr", "Считываем товарные данные",
+                                            details="Продолжаем распознавание текста",
+                                            progress=progress+int(6*len(results)/len(images)))
                     return results, elapsed
             self.engine.text_recognizer = StreamingRecognizer()
             try:
@@ -187,6 +196,7 @@ class ReceiptPipeline:
     def _process_attempt(self, job, *, orientation_mode):
         started = perf_counter()
         job.phase("input", 5, "Подготавливаем фотографию")
+        emit_status(job, "input", "Проверяем ориентацию и качество фотографии")
         image, exif_rotated = decode_photo((job.directory / "upload.bin").read_bytes())
         # Portrait normal mode is intentionally free: no orientation OCR and
         # no early model initialization. Landscape and recovery reuse RapidOCR.
@@ -228,6 +238,7 @@ class ReceiptPipeline:
                 "Нужна ручная проверка снимка."
             )
         job.publish("contour", target="original", polygon=polygon.tolist(), title="Граница таблицы найдена", progress=24)
+        emit_status(job, "geometry", "Найдена товарная таблица", details="Определяем её границы")
         warnings = list(boundary["warnings"])
         header_bottom = max(0, int(polygon[:, 1].min())-4)
         if header_bottom >= 80:
@@ -250,12 +261,17 @@ class ReceiptPipeline:
         subtitle = {"wave_grid":"Выпрямлены волны по внутренней сетке; ячейка итога сохранена",
                     "original_crop_fallback":"Сохранена исходная геометрия: требуется проверка"}.get(metadata["method"],"Выпрямлены границы; нижняя ячейка итога сохранена")
         job.publish("message",title=subtitle,progress=37)
+        emit_status(job, "geometry", "Выпрямляем таблицу", details=subtitle)
         job.image("rectified", rectified, "Rectify · рабочая таблица", subtitle)
         np.savez_compressed(job.directory / "rectification_map.npz", map_x=map_x, map_y=map_y)
         job.json_file("rectification.json", metadata)
         job.phase("layout", 40, "Находим строки и столбцы")
         layout = table_layout(rectified, metadata)
         layout.setdefault("body_left",metadata["margin"])
+        estimated_rows = preliminary_row_count(layout.get("row_boundaries", []))
+        emit_status(job, "layout", "Определяем товарные строки",
+                    details=(f"Предварительно выделено {estimated_rows} строк таблицы"
+                             if estimated_rows else "Границы строк уточняются"))
         job.publish("cells", target="rectified", cells=grid_cells(layout), title="Предварительная разметка ячеек", progress=44)
         job.phase("ocr", 47, "Готовим локальный OCR и справочники")
         self.resources()
@@ -272,6 +288,8 @@ class ReceiptPipeline:
             number = re.search(r"(?:тапсырыс|заказ|№|\bno\b|\bne\b)[^\d\n]{0,15}(\d{6,})", header_text, re.IGNORECASE)
             job.publish("header", date=date.group(0) if date else "", order_number=number.group(1) if number else "")
         job.phase("ocr", 58, "Сканируем текст в ячейках")
+        emit_status(job, "ocr", "Распознаём товары, количество и цены",
+                    details="Читаем строки таблицы")
         def draft_ready(partial):
             provisional = aligned_lines(dict(lines=partial), metadata)
             boundaries, _ = choose_row_boundaries(provisional, layout)
@@ -281,7 +299,8 @@ class ReceiptPipeline:
                            stage="ocr", match=None, similarity=None, articles=[], needs_review=False,
                            ocr_name_confidence_pct=round(row["ocr_confidence"]*100, 2))
             job.publish("draft_rows", rows=draft, title="Чек собирается из OCR", progress=64)
-        raw_result = self.recognize(job.directory / "rectified.png", job, "rectified", 64, on_partial=draft_ready)
+        raw_result = self.recognize(job.directory / "rectified.png", job, "rectified", 64,
+                                    on_partial=draft_ready, row_boundaries=layout.get("row_boundaries"))
         lines = []
         for box, text, confidence in raw_result:
             box = np.asarray(box, np.float32)
@@ -300,6 +319,7 @@ class ReceiptPipeline:
         job.json_file("ocr_rectified.json", dict(lines=lines, variant="rectified"))
         (job.directory / "ocr_rectified.txt").write_text("\n".join(line["text"] for line in lines), encoding="utf-8")
         job.phase("layout", 74, "Объединяем строки товара и отделяем НДС")
+        emit_status(job, "layout", "Собираем товарные строки", details="Отделяем НДС от товаров")
         aligned = aligned_lines(dict(lines=lines), metadata)
         boundaries, segmentation = choose_row_boundaries(aligned, layout)
         layout["row_boundaries"] = enforce_cell_boundaries(aligned, layout, boundaries)
@@ -312,10 +332,14 @@ class ReceiptPipeline:
         else:
             split_rows,row_split_check = dict(rows=rows),[dict(applied=False,reason='disabled_for_independent_baseline')]
         rows = split_rows['rows']
+        rt = row_totals(rows)
+        emit_status(job, "layout", "Определяем товары и НДС",
+                    details=f"Найдено {rt['products']} товаров, строк НДС: {rt['tax_rows']}")
         job.json_file('row_split.json',row_split_check)
         restored_count = sum(item['applied'] for item in row_split_check)
         if restored_count:
             job.publish('message',title=f'Склеенные товарные строки разделены: {restored_count}; печатная граница, числа и итог проверены',progress=76)
+        emit_status(job, "check", "Проверяем количество и цены", details="Уточняем неоднозначные значения")
         with self.ocr_lock:
             recovered,quantity_check,_ = recover_quantities(dict(rows=rows,total_raw=total),rectified,layout,
                 lambda crops:self.engine.text_recognizer(crops)[0])
@@ -345,6 +369,10 @@ class ReceiptPipeline:
                        ocr_name_confidence_pct=round(row["ocr_confidence"]*100, 2))
         job.publish("draft_rows", rows=rows, pass_similarity=PASS_SIMILARITY, title="OCR готов. Начинаем подбор названий", progress=80)
         job.phase("matching", 81, "Сопоставляем товары со справочником")
+        total_products = sum(row.get("kind") == "product" for row in rows)
+        matched_products = 0
+        emit_status(job, "matching", "Сопоставляем товары со справочником",
+                    details=f"Всего товаров: {total_products}")
         for index, row in enumerate(rows):
             row["match"] = self.matcher.match(row["name_raw"]) if row["kind"] == "product" else dict(status="excluded_"+row["kind"], best=None, top_matches=[])
             row["ocr_name_confidence_pct"] = round(row["ocr_confidence"]*100, 2) if row["name_raw"].strip() else None
@@ -357,6 +385,10 @@ class ReceiptPipeline:
             row["stage"] = "matched"
             initialize_row(row, PASS_SIMILARITY)
             job.publish("row", row=row, progress=81+int(15*(index+1)/max(1, len(rows))), title=f"Обработана строка {index+1} из {len(rows)}")
+            if row["kind"] == "product":
+                matched_products += 1
+                emit_status(job, "matching", "Сопоставляем названия товаров",
+                            matched_products=matched_products, total_products=total_products)
 
         header_text = "\n".join(line["text"] for line in header_lines)
         date = re.search(r"\b\d{2}[./]\d{2}[./]20\d{2}\b", header_text)
@@ -371,6 +403,11 @@ class ReceiptPipeline:
                       raw_text="\n".join(line["text"] for line in lines),
                       downloads={key:f"/api/jobs/{job.id}/files/{name}" for key, name in
                                  (("json", "receipt.json"), ("csv", "receipt.csv"), ("text", "ocr_rectified.txt"))})
+        emit_status(job, "check", "Проверяем цены, НДС и итог",
+                    details="Вычисляем суммы по прочитанным строкам")
         update_receipt(result)
         save_receipt(job.directory, result)
+        emit_status(job, "check", "Данные чека подготовлены",
+                    details=f"{len(products)} товаров, требуют проверки: {result['review_count']}")
         return result
+
