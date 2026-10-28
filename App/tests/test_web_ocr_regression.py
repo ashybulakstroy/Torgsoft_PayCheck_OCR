@@ -2,7 +2,8 @@
 import copy
 import json
 from pathlib import Path
-from experiments.web_ocr_regression import latest_jobs,quality_gate_jobs,run
+import pytest
+from experiments.web_ocr_regression import latest_jobs,quality_gate_jobs,quality_gate_required,run
 
 
 def write_job(root,index,status='done'):
@@ -43,6 +44,13 @@ def test_quality_gate_uses_unique_golden_then_latest_web_up_to_limit(tmp_path):
     assert [job['source'] for job in jobs]==['golden','golden','web','web']
     assert jobs[2]['created_at']==13 and jobs[3]['created_at']==12
     assert len({job['upload_sha256'] for job in jobs})==4
+
+
+def test_quality_gate_only_applies_to_image_and_ocr_changes():
+    assert quality_gate_required('image_ocr')
+    assert not quality_gate_required('web_ui')
+    assert not quality_gate_required('catalog')
+    with pytest.raises(ValueError):quality_gate_required('unknown')
 
 
 def test_stops_immediately_and_saves_partial_report(tmp_path):

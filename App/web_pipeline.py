@@ -32,6 +32,10 @@ from App.row_cell_split import repair as split_merged_product_rows
 MAX_PIXELS = 25_000_000
 
 
+class _RetryOrientationAfterNoText(ValueError):
+    """Request one full retry from the EXIF-normalized source image."""
+
+
 def decode_photo(data):
     try:
         with Image.open(io.BytesIO(data)) as photo:
@@ -174,26 +178,55 @@ class ReceiptPipeline:
         return result or []
 
     def process(self, job):
+        try:
+            return self._process_attempt(job, orientation_mode="normal")
+        except _RetryOrientationAfterNoText:
+            job.publish("message", title="Текст или таблица не обнаружены; проверяем 4 поворота чека")
+            return self._process_attempt(job, orientation_mode="recovery")
+
+    def _process_attempt(self, job, *, orientation_mode):
         started = perf_counter()
         job.phase("input", 5, "Подготавливаем фотографию")
-        image, rotated = decode_photo((job.directory / "upload.bin").read_bytes())
-        # Reuse the project's existing RapidOCR instance; no second OCR engine.
-        self.resources()
+        image, exif_rotated = decode_photo((job.directory / "upload.bin").read_bytes())
+        # Portrait normal mode is intentionally free: no orientation OCR and
+        # no early model initialization. Landscape and recovery reuse RapidOCR.
+        if orientation_mode == "recovery" or image.shape[0] < image.shape[1]:
+            self.resources()
         image, orientation_info = orient_receipt(
-            image, engine=self.engine, ocr_lock=self.ocr_lock
+            image, engine=self.engine, ocr_lock=self.ocr_lock,
+            mode=orientation_mode,
         )
-        job.json_file("orientation.json", orientation_info)
-        orientation_caption = (
-            f"EXIF учтён; поворот по тексту: {orientation_info['rotation_clockwise']}°"
-            if orientation_info["status"] == "OK"
-            else "Ориентация не подтверждена; изображение оставлено без поворота"
+        job.json_file(
+            "orientation.json" if orientation_mode == "normal" else "orientation_recovery.json",
+            orientation_info,
         )
-        job.image("original", image, "Ориентированное фото", orientation_caption, role="original")
+        if orientation_mode == "recovery" and (
+            orientation_info["status"] != "OK"
+            or orientation_info["rotation_clockwise"] == 0
+        ):
+            raise ValueError(
+                "Повторная проверка 4 ориентаций не подтвердила другой поворот. "
+                "Требуется ручная проверка фото."
+            )
+        job.image(
+            "original", image, "Ориентированное фото",
+            f"Режим: {orientation_mode}; EXIF: {exif_rotated}; "
+            f"поворот: {orientation_info['rotation_clockwise']}°; "
+            f"статус: {orientation_info['status']}",
+            role="original",
+        )
         job.phase("geometry", 13, "Ищем границы товарной таблицы")
         boundary = detect_table_boundary(image)
         polygon = boundary["polygon"]
         if polygon is None:
-            raise ValueError("Не удалось найти рамку таблицы. Снимите чек целиком, ближе и при хорошем освещении.")
+            if orientation_mode == "normal":
+                raise _RetryOrientationAfterNoText(
+                    "Не обнаружена таблица; возможна ошибочная ориентация"
+                )
+            raise ValueError(
+                "Не удалось найти рамку таблицы после проверки ориентации. "
+                "Нужна ручная проверка снимка."
+            )
         job.publish("contour", target="original", polygon=polygon.tolist(), title="Граница таблицы найдена", progress=24)
         warnings = list(boundary["warnings"])
         header_bottom = max(0, int(polygon[:, 1].min())-4)
@@ -257,7 +290,13 @@ class ReceiptPipeline:
             original_box = np.column_stack([cv2.remap(mapping, mx, my, cv2.INTER_LINEAR).reshape(-1) for mapping in (map_x, map_y)])
             lines.append(dict(text=str(text), confidence=float(confidence), box=box.tolist(), box_original=original_box.tolist()))
         if not lines:
-            raise ValueError("Текст не распознан. Попробуйте более чёткую фотографию.")
+            if orientation_mode == "normal":
+                raise _RetryOrientationAfterNoText(
+                    "RapidOCR не прочёл ни одного текстового блока"
+                )
+            raise ValueError(
+                "Текст не распознан даже после повторного определения ориентации."
+            )
         job.json_file("ocr_rectified.json", dict(lines=lines, variant="rectified"))
         (job.directory / "ocr_rectified.txt").write_text("\n".join(line["text"] for line in lines), encoding="utf-8")
         job.phase("layout", 74, "Объединяем строки товара и отделяем НДС")
