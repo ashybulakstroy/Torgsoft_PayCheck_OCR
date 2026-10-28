@@ -2,7 +2,7 @@
 import copy
 import json
 from pathlib import Path
-from experiments.web_ocr_regression import latest_jobs,run
+from experiments.web_ocr_regression import latest_jobs,quality_gate_jobs,run
 
 
 def write_job(root,index,status='done'):
@@ -13,6 +13,7 @@ def write_job(root,index,status='done'):
     dump('receipt.json',dict(rows=[row],total_raw='10'))
     dump('ocr_rectified.json',dict(lines=[dict(text='Товар',confidence=.9,box=[[0,0],[1,0],[1,1],[0,1]])]))
     (directory/'original.png').write_bytes(b'image')
+    (directory/'upload.bin').write_bytes(f'upload-{index}'.encode())
     return directory
 
 
@@ -29,6 +30,19 @@ def test_selects_latest_100_by_creation_not_filename_or_modification(tmp_path):
     jobs=latest_jobs(tmp_path)
     assert len(jobs)==100
     assert [j['created_at'] for j in jobs]==list(reversed(range(3,103)))
+
+
+def test_quality_gate_uses_unique_golden_then_latest_web_up_to_limit(tmp_path):
+    golden=tmp_path/'golden';web=tmp_path/'web'
+    first=write_job(golden,1);write_job(golden,2)
+    duplicate=write_job(web,10)
+    (duplicate/'upload.bin').write_bytes((first/'upload.bin').read_bytes())
+    write_job(web,11);write_job(web,12);write_job(web,13)
+    jobs=quality_gate_jobs(web,golden,limit=4)
+    assert len(jobs)==4
+    assert [job['source'] for job in jobs]==['golden','golden','web','web']
+    assert jobs[2]['created_at']==13 and jobs[3]['created_at']==12
+    assert len({job['upload_sha256'] for job in jobs})==4
 
 
 def test_stops_immediately_and_saves_partial_report(tmp_path):
@@ -72,6 +86,20 @@ def test_unverified_regrouping_is_failure(tmp_path):
         result=unchanged(case);result['receipt']['rows'][0]['name_raw']='Другой товар';return result
     code,summary=run(changed,tmp_path/'jobs',tmp_path/'out',emit=quiet)
     assert code==1 and 'эталоном' in ';'.join(summary['records'][0]['reasons'])
+
+
+def test_removing_split_table_header_is_safe_improvement(tmp_path):
+    write_job(tmp_path/'jobs',1)
+    receipt_path=next((tmp_path/'jobs').glob('*/receipt.json'))
+    receipt=json.loads(receipt_path.read_text())
+    receipt['rows'].insert(0,dict(row=1,kind='product',name_raw='N',quantity_raw='Саны',price_raw='Багасы',raw_lines=[]))
+    receipt_path.write_text(json.dumps(receipt))
+    def without_header(case):
+        result=unchanged(case)
+        result['receipt']['rows']=result['receipt']['rows'][1:]
+        return result
+    code,summary=run(without_header,tmp_path/'jobs',tmp_path/'out',emit=quiet)
+    assert code==2 and summary['better']==1 and summary['worse']==0
 
 
 def test_user_tolerated_name_change_is_unchanged(tmp_path):

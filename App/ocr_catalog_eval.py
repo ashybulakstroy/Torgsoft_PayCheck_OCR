@@ -469,7 +469,7 @@ def classify_name(text):
         return "service"
     if "корыт" in normalized or "қорыт" in normalized or "итого" in normalized:
         return "total"
-    return "product"
+    return "product"def is_table_header_row(row):    """Recognize a printed table header after its cells were grouped."""    def compact(value):        return unicodedata.normalize("NFKC", str(value or "")).casefold().replace(" ", "")    name = compact(row.get("name_raw", ""))    quantity = compact(row.get("quantity_raw", ""))    price = compact(row.get("price_raw", ""))    item = compact(row.get("item_number_raw", ""))    markers = [        name in {"n", "no", "ne", "№"} or item in {"n", "no", "ne", "№"}        or any(token in name for token in ("атау", "атайы", "наимен", "назван")),        any(token in quantity for token in ("саны", "колво", "кол-во", "колич")),        any(token in price for token in ("бага", "цена", "стоим")),    ]    return sum(markers) >= 2
 
 
 def aligned_lines(payload, metadata, original=False):
@@ -617,7 +617,7 @@ def parse_rows(lines, layout, row_boundaries):
         bands.append(dict(index=index, start=start, end=end, members=members, anchor=row_anchor_y(members, layout)))
     resolve_boundary_lines(bands, layout)
     rows = []
-    for out_row, band in enumerate(bands, 1):
+    for band in bands:
         members = band["members"]
         name, quantities, prices, item_numbers = [], [], [], []
         header_found = False
@@ -655,11 +655,11 @@ def parse_rows(lines, layout, row_boundaries):
             prices = new_prices
 
         name_text = " ".join(line["text"] for line in name)
-        row = dict(row=out_row, item_number_raw=" ".join(item_numbers), y_range=[band["start"], band["end"]], name_raw=name_text, quantity_raw=" ".join(quantities),
+        row = dict(row=len(rows)+1, item_number_raw=" ".join(item_numbers), y_range=[band["start"], band["end"]], name_raw=name_text, quantity_raw=" ".join(quantities),
                    price_raw=" ".join(prices), kind="header" if header_found and not name else classify_name(name_text),
                    ocr_confidence=float(np.mean([l["confidence"] for l in name])) if name else 0,
                    raw_lines=[{k: l[k] for k in ("text", "confidence", "box", "box_original")} for l in members])
-        if row["kind"] != "header":
+        if row["kind"] != "header" and not is_table_header_row(row):
             rows.append(row)
     return rows
 

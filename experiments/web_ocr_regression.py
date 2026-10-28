@@ -6,6 +6,7 @@ Only independently reviewed references may set verified=True for changed text.
 from pathlib import Path
 import argparse
 import copy
+import hashlib
 import importlib
 import json
 from datetime import datetime
@@ -26,6 +27,29 @@ def latest_jobs(root,limit=100):
             jobs.append(dict(id=directory.name,path=directory,created_at=float(state['created_at']),
                              filename=state.get('filename','')))
     return sorted(jobs,key=lambda job:(job['created_at'],job['id']),reverse=True)[:limit]
+
+
+def quality_gate_jobs(web_root,golden_root,limit=16):
+    """Select unique golden receipts first, then newest completed web receipts."""
+    selected=[];digests=set()
+    def add(directory,created_at,filename,source):
+        upload=directory/'upload.bin'
+        if not upload.is_file():raise ValueError(f'нет upload.bin: {directory}')
+        digest=hashlib.sha256(upload.read_bytes()).hexdigest()
+        if digest in digests or len(selected)>=limit:return
+        for name in ['receipt.json','ocr_rectified.json','original.png']:
+            if not (directory/name).is_file():raise ValueError(f'нет артефакта {name}: {directory}')
+        digests.add(digest)
+        selected.append(dict(id=directory.name,path=directory,created_at=created_at,
+                             filename=filename,source=source,upload_sha256=digest))
+    golden_root=Path(golden_root)
+    if golden_root.exists():
+        for directory in sorted((path for path in golden_root.iterdir() if path.is_dir()),key=lambda p:p.name):
+            receipt=read(directory/'receipt.json') if (directory/'receipt.json').is_file() else {}
+            add(directory,0.,receipt.get('filename',''), 'golden')
+    for job in latest_jobs(Path(web_root),100):
+        add(job['path'],job['created_at'],job['filename'],'web')
+    return selected
 
 
 def raw_receipt(saved):
@@ -51,12 +75,16 @@ def load_case(job):
 
 def assess(case,candidate):
     from App.receipt_editing import parse_number,update_receipt
-    from App.ocr_catalog_eval import classify_name
+    from App.ocr_catalog_eval import classify_name,is_table_header_row
     before=case['receipt'];after=candidate['receipt']
     tolerated=candidate.get('review_disposition')=='tolerated_unchanged'
-    old=[r for r in before['rows'] if r['kind'] in {'product','service','tax'}]
+    old_all=[r for r in before['rows'] if r['kind'] in {'product','service','tax'}]
+    removed_headers=[r for r in old_all if is_table_header_row(r)]
+    old=[r for r in old_all if r not in removed_headers]
     new=[r for r in after['rows'] if r['kind'] in {'product','service','tax'}]
     reasons=[];changes=[]
+    if removed_headers and not any(is_table_header_row(row) for row in new):
+        changes.append('исключена строка шапки таблицы')
     if len(old)!=len(new):
         message=f'число строк {len(old)} → {len(new)}'
         if candidate.get('verified'):changes.append(message)
@@ -82,7 +110,8 @@ def assess(case,candidate):
     if delta<0 and not tolerated:reasons.append('меньше OCR-блоков: требуется подтверждение')
     if confidence < -1e-6 and not tolerated:reasons.append('снизилась средняя уверенность OCR')
     tolerated=bool(changes) and tolerated
-    if changes and not candidate.get('verified') and not tolerated:
+    non_header_changes=[change for change in changes if change != 'исключена строка шапки таблицы']
+    if non_header_changes and not candidate.get('verified') and not tolerated:
         reasons.append('изменённые данные не подтверждены независимым эталоном')
     # A verified reference may approve corrected fields, but cannot override a
     # numeric regression or lost VAT/math check silently in this general runner.
@@ -91,7 +120,7 @@ def assess(case,candidate):
                 detail=candidate.get('detail',''))
 
 
-def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report=False,start_index=1):
+def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report=False,start_index=1,jobs_override=None):
     out.mkdir(parents=True,exist_ok=True)
     summary=dict(requested=limit,files_tested=0,worse=0,better=0,unchanged=0,
                  mean_delta_lines=0,mean_delta_confidence=0,status='running',scope=scope,records=[])
@@ -112,7 +141,7 @@ def run(candidate,root,out,limit=100,scope='segmentation',emit=print,open_report
             summary['visual_report_error']=str(error)
             emit(f'Ошибка создания визуального отчёта: {error}. Данные остановки: {out/"summary.json"}',flush=True)
         save()
-    try:jobs=latest_jobs(root,limit)
+    try:jobs=list(jobs_override) if jobs_override is not None else latest_jobs(root,limit)
     except (Exception,KeyboardInterrupt) as error:
         summary.update(status='failed',error=f'Не удалось выбрать историю: {type(error).__name__}: {error}');save();emit(summary['error']);visual_stop();return 1,summary
     total_available=len(jobs)
@@ -171,6 +200,8 @@ def main(default_candidate=None,default_scope='segmentation'):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate',default=default_candidate,required=default_candidate is None,help='module:function')
     parser.add_argument('--jobs',type=Path,default=ROOT/'web_outputs')
+    parser.add_argument('--golden',type=Path,default=ROOT/'data'/'golden')
+    parser.add_argument('--limit',type=int,default=16,help='общий лимит golden + последние веб-чеки')
     parser.add_argument('--output',type=Path)
     parser.add_argument('--scope',choices=['segmentation','full_pipeline'],default=default_scope)
     parser.add_argument('--start-index',type=int,default=1,help='начать с позиции в списке новых завершённых чеков (нумерация с 1)')
@@ -180,7 +211,9 @@ def main(default_candidate=None,default_scope='segmentation'):
     candidate=getattr(importlib.import_module(module),name)
     from App.artifact_paths import OCR_REPORTS
     out=args.output or OCR_REPORTS/datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-    code,summary=run(candidate,args.jobs,out,scope=args.scope,open_report=not args.no_open_report,start_index=args.start_index)
+    selected=quality_gate_jobs(args.jobs,args.golden,args.limit)
+    code,summary=run(candidate,args.jobs,out,limit=args.limit,scope=args.scope,
+                     open_report=not args.no_open_report,start_index=args.start_index,jobs_override=selected)
     print(f'Отчёт: {out/"summary.json"}',flush=True)
     raise SystemExit(code)
 

@@ -5,7 +5,7 @@ import openpyxl
 import pytest
 
 from App.ocr_catalog_eval import (CatalogMatcher, PASS_SIMILARITY, catalog_conflicts, choose_row_boundaries,
-                                  classify_name, comparison_key, fallback_variants, load_catalog, normalize_name,
+                                  classify_name, comparison_key, fallback_variants, is_table_header_row, load_catalog, normalize_name,
                                   parse_rows, penalty_numbers, punctuation_key, similarity_color, needs_review,
                                   write_excel)
 from App.ocr_catalog_eval import aligned_lines
@@ -210,7 +210,7 @@ def test_boundary_line_stays_when_its_anchor_is_closer():
     ]
     rows = parse_rows(lines, layout, [80., 110., 150.])
     assert "ПОГРАНИЧНАЯ СТРОКА" in rows[0]["name_raw"]
-    assert "ПОГРАНИЧНАЯ СТРОКА" not in rows[1]["name_raw"]
+    assert "ПОГРАНИЧНАЯ СТРОКА" not in rows[1]["name_raw"]def test_split_table_header_never_becomes_receipt_product_and_rows_are_renumbered():    layout = dict(name_left=30., name_right=180., quantity_right=220., right=300.)    lines = [make_line("N", 100., 85., 105.), make_line("Саны", 200., 85., 105.),             make_line("Багасы", 250., 85., 105.), make_line("Товар", 100., 125., 145.),             make_line("2", 200., 125., 145.), make_line("500T", 250., 125., 145.)]    rows = parse_rows(lines, layout, [80., 110., 150.])    assert len(rows) == 1    assert rows[0]["row"] == 1    assert rows[0]["name_raw"] == "Товар"    assert is_table_header_row(dict(name_raw="N", quantity_raw="Саны", price_raw="Багасы", item_number_raw=""))
 
 
 @pytest.mark.parametrize("label", ["НДС 16 %", "НДС16%", "HDC", "HDС 16 %"])
