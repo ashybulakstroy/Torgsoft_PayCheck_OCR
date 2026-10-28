@@ -19,6 +19,9 @@ debug_notes/
 data/in_data/
 models/
 
+# Experiments (local only, not published to GitHub)
+experiments/
+
 # Backup archives and editor/system files
 *.zip
 .vscode/

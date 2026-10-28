@@ -16,6 +16,7 @@ from rapidocr_onnxruntime import RapidOCR
 from rapidfuzz import fuzz, process
 
 from App.receipt_rectification import rectify_table
+from experiments.receipt_orientation_detector import orient_receipt
 from App.rotation_rectification import rotate_table_crop
 from App.ocr_catalog_eval import (ROOT, PASS_SIMILARITY, CatalogMatcher, aligned_lines,
                                   choose_row_boundaries, enforce_cell_boundaries, load_catalog,
@@ -176,7 +177,18 @@ class ReceiptPipeline:
         started = perf_counter()
         job.phase("input", 5, "Подготавливаем фотографию")
         image, rotated = decode_photo((job.directory / "upload.bin").read_bytes())
-        job.image("original", image, "Исходное фото", "Ориентация EXIF учтена" if rotated else "Оригинал сохранён без изменений", role="original")
+        # Reuse the project's existing RapidOCR instance; no second OCR engine.
+        self.resources()
+        image, orientation_info = orient_receipt(
+            image, engine=self.engine, ocr_lock=self.ocr_lock
+        )
+        job.json_file("orientation.json", orientation_info)
+        orientation_caption = (
+            f"EXIF учтён; поворот по тексту: {orientation_info['rotation_clockwise']}°"
+            if orientation_info["status"] == "OK"
+            else "Ориентация не подтверждена; изображение оставлено без поворота"
+        )
+        job.image("original", image, "Ориентированное фото", orientation_caption, role="original")
         job.phase("geometry", 13, "Ищем границы товарной таблицы")
         boundary = detect_table_boundary(image)
         polygon = boundary["polygon"]

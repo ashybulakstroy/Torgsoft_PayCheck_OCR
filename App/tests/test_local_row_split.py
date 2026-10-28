@@ -103,6 +103,8 @@ def test_web_pipeline_applies_row_split_and_baseline_can_disable_it(tmp_path,mon
         pipeline.matcher=SimpleNamespace(match=lambda text:dict(status='not_found',best=None,top_matches=[],gap=0))
         pipeline.catalog_count=0
         monkeypatch.setattr(pipeline,'resources',lambda:None)
+        monkeypatch.setattr(pipeline_module,'orient_receipt',lambda image,**kwargs:(image,{
+            'status':'UNCERTAIN','rotation_clockwise':0}))
         total_box=[[400.,243.],[488.,243.],[488.,259.],[400.,259.]]
         monkeypatch.setattr(pipeline,'recognize',lambda *a,**kw:[(l['box'],l['text'],l['confidence']) for l in lines]+[(total_box,'50.00 T',.95)])
         (directory/'upload.bin').write_bytes(cv2.imencode('.png',image)[1].tobytes())
