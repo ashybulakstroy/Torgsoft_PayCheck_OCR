@@ -16,6 +16,7 @@ from rapidocr_onnxruntime import RapidOCR
 from rapidfuzz import fuzz, process
 
 from experiments.ocr_activity import preliminary_row_count, completed_text_rows, row_totals, emit_status
+from experiments.visual_sync import emit as emit_visual, raw_row as visual_raw_row
 from App.receipt_rectification import rectify_table
 from experiments.receipt_orientation_detector import orient_receipt
 from App.rotation_rectification import rotate_table_crop
@@ -238,6 +239,7 @@ class ReceiptPipeline:
                 "Нужна ручная проверка снимка."
             )
         job.publish("contour", target="original", polygon=polygon.tolist(), title="Граница таблицы найдена", progress=24)
+        emit_visual(job, "geometry_found", target="original", message="Контур таблицы найден")
         emit_status(job, "geometry", "Найдена товарная таблица", details="Определяем её границы")
         warnings = list(boundary["warnings"])
         header_bottom = max(0, int(polygon[:, 1].min())-4)
@@ -263,6 +265,7 @@ class ReceiptPipeline:
         job.publish("message",title=subtitle,progress=37)
         emit_status(job, "geometry", "Выпрямляем таблицу", details=subtitle)
         job.image("rectified", rectified, "Rectify · рабочая таблица", subtitle)
+        emit_visual(job, "geometry_ready", target="rectified", message="Таблица выпрямлена · готовим распознавание")
         np.savez_compressed(job.directory / "rectification_map.npz", map_x=map_x, map_y=map_y)
         job.json_file("rectification.json", metadata)
         job.phase("layout", 40, "Находим строки и столбцы")
@@ -280,7 +283,11 @@ class ReceiptPipeline:
         header_lines = []
         header_bottom = max(0, int(polygon[:, 1].min())-4)
         if header_bottom >= 80:
-            header_result = self.recognize(job.directory / "header.png", job, "header", 50)
+            emit_visual(job, "scan_start", target="header", message="Читаем шапку чека")
+            try:
+                header_result = self.recognize(job.directory / "header.png", job, "header", 50)
+            finally:
+                emit_visual(job, "scan_stop", target="header")
             header_lines = [dict(text=str(text), confidence=float(confidence), box=box) for box, text, confidence in header_result]
             job.json_file("ocr_header.json", dict(lines=header_lines))
             header_text = "\n".join(line["text"] for line in header_lines)
@@ -290,6 +297,7 @@ class ReceiptPipeline:
         job.phase("ocr", 58, "Сканируем текст в ячейках")
         emit_status(job, "ocr", "Распознаём товары, количество и цены",
                     details="Читаем строки таблицы")
+        visual_seen_rows = set()
         def draft_ready(partial):
             provisional = aligned_lines(dict(lines=partial), metadata)
             boundaries, _ = choose_row_boundaries(provisional, layout)
@@ -299,8 +307,18 @@ class ReceiptPipeline:
                            stage="ocr", match=None, similarity=None, articles=[], needs_review=False,
                            ocr_name_confidence_pct=round(row["ocr_confidence"]*100, 2))
             job.publish("draft_rows", rows=draft, title="Чек собирается из OCR", progress=64)
-        raw_result = self.recognize(job.directory / "rectified.png", job, "rectified", 64,
-                                    on_partial=draft_ready, row_boundaries=layout.get("row_boundaries"))
+            for draft_row in draft:
+                row_id = draft_row.get("row")
+                if (row_id not in visual_seen_rows and draft_row.get("kind") in {"product", "tax", "service"}
+                        and str(draft_row.get("name_raw") or "").strip()):
+                    visual_seen_rows.add(row_id)
+                    emit_visual(job, "row_ready", row=visual_raw_row(draft_row))
+        emit_visual(job, "scan_start", target="rectified", message="Распознаём товарные строки")
+        try:
+            raw_result = self.recognize(job.directory / "rectified.png", job, "rectified", 64,
+                                        on_partial=draft_ready, row_boundaries=layout.get("row_boundaries"))
+        finally:
+            emit_visual(job, "scan_stop", target="rectified")
         lines = []
         for box, text, confidence in raw_result:
             box = np.asarray(box, np.float32)
@@ -319,6 +337,7 @@ class ReceiptPipeline:
         job.json_file("ocr_rectified.json", dict(lines=lines, variant="rectified"))
         (job.directory / "ocr_rectified.txt").write_text("\n".join(line["text"] for line in lines), encoding="utf-8")
         job.phase("layout", 74, "Объединяем строки товара и отделяем НДС")
+        emit_visual(job, "checking", message="Собираем товары, проверяем количество, цены и НДС")
         emit_status(job, "layout", "Собираем товарные строки", details="Отделяем НДС от товаров")
         aligned = aligned_lines(dict(lines=lines), metadata)
         boundaries, segmentation = choose_row_boundaries(aligned, layout)
@@ -368,7 +387,15 @@ class ReceiptPipeline:
                        match=None, articles=[], similarity=None, needs_review=False,
                        ocr_name_confidence_pct=round(row["ocr_confidence"]*100, 2))
         job.publish("draft_rows", rows=rows, pass_similarity=PASS_SIMILARITY, title="OCR готов. Начинаем подбор названий", progress=80)
+        for complete_row in rows:
+            if (complete_row.get("row") not in visual_seen_rows
+                    and complete_row.get("kind") in {"product", "tax", "service"}
+                    and str(complete_row.get("name_raw") or "").strip()):
+                visual_seen_rows.add(complete_row["row"])
+                emit_visual(job, "row_ready", row=visual_raw_row(complete_row))
+        emit_visual(job, "rows_ready", message="Товарные строки собраны · значения предварительные")
         job.phase("matching", 81, "Сопоставляем товары со справочником")
+        emit_visual(job, "matching", message="Сопоставляем товары с номенклатурой")
         total_products = sum(row.get("kind") == "product" for row in rows)
         matched_products = 0
         emit_status(job, "matching", "Сопоставляем товары со справочником",
@@ -410,4 +437,5 @@ class ReceiptPipeline:
         emit_status(job, "check", "Данные чека подготовлены",
                     details=f"{len(products)} товаров, требуют проверки: {result['review_count']}")
         return result
+
 

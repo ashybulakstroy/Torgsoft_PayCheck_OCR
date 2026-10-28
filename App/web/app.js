@@ -16,7 +16,7 @@ function setProgress(value){const progress=Math.max(0,Math.min(100,value));$('pr
 function setPhase(phase, title){
   if(state.activePhase&&phase!==state.activePhase&&stepKeys.includes(state.activePhase))state.completed.add(state.activePhase);
   state.completed.delete(phase);state.activePhase=phase;
-  if(['ocr','layout','matching'].includes(phase))startTransferFlow();
+  // VISUAL_SYNC_V2: no artificial flying dots during non-OCR stages.
   $('process-title').textContent=title;
   const subtitles={input:'Сохраняем оригинал и учитываем ориентацию',geometry:'Контур → crop → выпрямленная таблица',ocr:'Распознавание выполняется на вашем компьютере',layout:'Визуализируем рамки и отделяем НДС',matching:'Названия сверяются с локальными справочниками',queued:'Можно загрузить следующее фото; оно встанет в очередь'};
   $('process-subtitle').textContent=subtitles[phase]||'Обработка фотографии';
@@ -67,8 +67,17 @@ function drawAsset(asset){
       }
     });
   }else if(asset.boxes){asset.boxes.forEach((box,index)=>polygon(svg,box,'ocr-box',(index%30)*.025));}
-  if(asset.key==='rectified'&&['ocr','layout'].includes(state.activePhase)){
-    const scan=document.createElementNS(SVG_NS,'line');scan.setAttribute('x1','0');scan.setAttribute('x2',asset.width);scan.setAttribute('y1','0');scan.setAttribute('y2','0');scan.setAttribute('class','scan-line');svg.append(scan);
+  if(asset.key===state.visualScanTarget && !state.visualScanPassed){
+    state.visualScanPassed=true;
+    const scan=document.createElementNS(SVG_NS,'line');
+    scan.setAttribute('x1','0');scan.setAttribute('x2',asset.width);
+    scan.setAttribute('y1','0');scan.setAttribute('y2','0');
+    scan.setAttribute('class','scan-line');svg.append(scan);
+    if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+      scan.animate([{transform:'translateY(0px)',opacity:.8},
+        {transform:`translateY(${asset.height}px)`,opacity:0}],
+        {duration:1400,easing:'ease-out',fill:'forwards'});
+    }else scan.remove();
   }
   syncTotalHighlight(asset);
 }
@@ -91,12 +100,13 @@ function animateRowTransfer(row){
   const token=state.token;
   // Measure after the processing scroll has positioned both panels.
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    if(token!==state.token||state.result)return;
+    if(token!==state.token)return; // VISUAL_SYNC_V2: animation may finish after OCR
     const asset=state.assets.get('rectified');
     const target=[...$('receipt-body').children].find(element=>Number(element.dataset.row)===row.row)?.children[1];
     if(!asset||!target)return;
     const source=[...asset.overlay.querySelectorAll('.cell-box')].find(shape=>Number(shape.dataset.row)===row.row);
-    const from=(source||asset.stage).getBoundingClientRect(),to=target.getBoundingClientRect();
+    if(!source)return; // VISUAL_SYNC_V2: never invent a source row location
+    const from=source.getBoundingClientRect(),to=target.getBoundingClientRect();
     const left=$('input-scroll').getBoundingClientRect(),right=$('output-scroll').getBoundingClientRect();
     if(!target.getClientRects().length||left.right>=right.right)return;
     const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
@@ -161,7 +171,7 @@ function addArtifact(data){
   card.append(header,stage,tools);$('image-list').append(card);
   const order=['original','header','crop','rectified'];
   [...$('image-list').children].sort((a,b)=>order.indexOf(a.dataset.key)-order.indexOf(b.dataset.key)).forEach(item=>$('image-list').append(item));
-  asset={...data,card,heading,subtitle,stage,img,overlay,dimensions};state.assets.set(data.key,asset);drawAsset(asset);
+  asset={...data,card,heading,subtitle,stage,img,overlay,dimensions};state.assets.set(data.key,asset);drawAsset(asset);window.ReceiptUploadGate?.asset(data.key);
   followProcessing();
 }
 function focusRow(rowId, persist=false){
@@ -322,6 +332,8 @@ async function saveEditedRow(){
   await sendEdit(payload);
 }
 function reset(){
+  window.ReceiptUploadGate?.reset();
+  VisualSync.reset();
   window.OcrActivity?.finish(false);
   renderMath.previousStatus=null;clearTimeout(showMathSuccess.timer);document.querySelector('.math-success-flash')?.remove();
   stopTransferFlow();
@@ -334,6 +346,8 @@ function reset(){
   document.querySelectorAll('[data-step]').forEach(step=>step.classList.remove('active','complete'));setProgress(0);setPill('Обработка','processing');
 }
 function showError(message){
+  window.ReceiptUploadGate?.failed(message);
+  VisualSync.reset();
   window.OcrActivity?.finish(false);
   stopTransferFlow();
   state.stream?.close();$('process-card').classList.remove('busy');$('error-card').hidden=false;$('error-text').textContent=message;$('process-title').textContent='Обработка остановлена';$('process-subtitle').textContent='Исходное фото сохранено';setPill('Нужна проверка','error');logEvent(message);
@@ -341,6 +355,8 @@ function showError(message){
 }
 function finish(result){
   if(!result)return;
+  window.ReceiptUploadGate?.finished(result);
+  VisualSync.finished();
   window.OcrActivity?.finish(true);
   stopTransferFlow();
   if(!state.result)focusRow(null,true);
@@ -357,22 +373,24 @@ function finish(result){
   if(result.warnings?.length){$('geometry-note').hidden=false;$('geometry-note').textContent=result.warnings.some(w=>w.includes('не удалось'))?result.warnings.join(' · '):'Граница таблицы содержит неоднозначные участки. Проверьте результат выпрямления по исходному фото.';}
 }
 function consume(event){
+  window.ReceiptUploadGate?.onPipeline(event);
   if(event.progress!==undefined)setProgress(event.progress);
   if(event.type==='phase'){setPhase(event.phase==='layout'&&event.progress<50?'geometry':event.phase,event.title);window.OcrActivity?.phase(event.phase,event.title);logEvent(event.title);}
   else if(event.type==='artifact'){addArtifact(event.artifact);logEvent(event.artifact.title);}
   else if(event.type==='contour'){const asset=state.assets.get(event.target);if(asset){asset.contour=event.polygon;drawAsset(asset);}logEvent(event.title);}
   else if(event.type==='region'){const asset=state.assets.get(event.target);if(asset){asset.region=event.box;drawAsset(asset);}}
-  else if(event.type==='boxes'){const asset=state.assets.get(event.target);if(asset){asset.boxes=event.boxes;asset.cells=null;drawAsset(asset);}logEvent(`${event.title}: ${event.boxes.length}`);}
+  else if(event.type==='boxes'){const asset=state.assets.get(event.target);if(asset){asset.boxes=event.boxes;drawAsset(asset); /* VISUAL_SYNC_V2: keep row cells during OCR */}logEvent(`${event.title}: ${event.boxes.length}`);}
   else if(event.type==='cells'){const asset=state.assets.get(event.target);if(asset){asset.cells=event.cells;drawAsset(asset);}logEvent(`${event.title} · ${event.cells.length} ячеек`);}
   else if(event.type==='header'){$('receipt-area').hidden=false;$('order-number').textContent=event.order_number?'№ '+event.order_number:'';$('receipt-date').textContent=event.date||'Дата не прочитана';}
   else if(event.type==='draft_rows'){window.OcrActivity?.rows(event.rows);if(event.pass_similarity!==undefined)state.passSimilarity=event.pass_similarity;state.rows=new Map(event.rows.map(row=>[row.row,row]));renderRows();$('receipt-meta').textContent='Черновик из OCR · названия ещё не сверены';}
   else if(event.type==='row'){state.rows.set(event.row.row,event.row);renderRows();focusRow(event.row.row);logEvent(event.title);}
+  else if(event.type==='visual'){VisualSync.handle(event);}
   else if(event.type==='message'){window.OcrActivity?.message(event.title);$('process-subtitle').textContent=event.title;logEvent(event.title);}
   else if(event.type==='ui_status'){window.OcrActivity?.uiStatus(event);$('process-subtitle').textContent=event.title;if(event.rows_total||event.matched_products!==undefined)logEvent(window.OcrActivity ? document.getElementById('ocr-activity-details').textContent : event.title);}
   else if(event.type==='complete'){finish(event.result);logEvent('Обработка завершена');}
   else if(event.type==='error')showError(event.title);
   if(event.type!=='complete'&&event.type!=='error')followProcessing();
-  if(event.type==='row')animateRowTransfer(event.row);
+  // VISUAL_SYNC_V2: transfers are triggered by raw OCR row_ready events, not catalog matching.
 }
 function listen(jobId, token){
   state.stream=new EventSource(`/api/jobs/${jobId}/events`);
@@ -389,14 +407,14 @@ async function upload(file){
   if(!file)return;
   if(file.size>state.maxUpload){toast(`Максимальный размер фото — ${Math.floor(state.maxUpload/1024/1024)} МБ`);return;}
   if(file.type&&!['image/jpeg','image/png','image/webp'].includes(file.type)){toast('Выберите фотографию JPG, PNG или WEBP');return;}
-  reset();window.OcrActivity?.start();const token=state.token;$('drop-zone').hidden=true;$('input-note').hidden=false;state.blob=URL.createObjectURL(file);
+  reset();window.OcrActivity?.start();const token=state.token;window.ReceiptUploadGate?.begin(token);$('drop-zone').hidden=true;$('input-note').hidden=false;state.blob=URL.createObjectURL(file);
   logEvent('Начало обработки: '+file.name);
   const preview=new Image();preview.src=state.blob;preview.onload=()=>{if(token===state.token&&!state.assets.has('original'))addArtifact({key:'original',role:'original',title:'Исходное фото',subtitle:file.name,url:preview.src,width:preview.naturalWidth,height:preview.naturalHeight});};
   $('process-title').textContent='Загружаем фотографию';$('process-subtitle').textContent=file.name;
   try{
     const response=await fetch('/api/jobs?filename='+encodeURIComponent(file.name||'clipboard.png'),{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});
     const job=await response.json();if(!response.ok)throw Error(job.error||'Не удалось загрузить фотографию');if(token!==state.token)return;
-    state.job=job.id;try{localStorage.setItem('receipt-last-job',job.id);}catch{}listen(job.id,token);
+    state.job=job.id;window.ReceiptUploadGate?.accepted(token);try{localStorage.setItem('receipt-last-job',job.id);}catch{}listen(job.id,token);
   }catch(error){if(token===state.token)showError(error.message||'Не удалось связаться с сервером');}
 }
 async function restore(){
@@ -405,7 +423,7 @@ async function restore(){
   const token=state.token;
   try{
     const response=await fetch(`/api/jobs/${id}`);if(!response.ok)return;const job=await response.json();if(token!==state.token)return;
-    state.job=id;$('drop-zone').hidden=true;$('empty-result').hidden=true;
+    state.job=id;window.ReceiptUploadGate?.restored(job);$('drop-zone').hidden=true;$('empty-result').hidden=true;
     job.artifacts.forEach(addArtifact);setProgress(job.progress);
     if(job.status==='done'){
       finish(job.result);
@@ -448,4 +466,311 @@ $('accept-match').addEventListener('click',()=>{const row=state.rows.get(state.e
 $('save-total').addEventListener('click',()=>sendEdit({expected_total:$('edit-expected-total').value}));
 $('finalize-receipt').addEventListener('click',()=>sendEdit({finalize:true}));
 fetch('/api/health').then(response=>{if(!response.ok)throw Error();return response.json();}).then(config=>{state.maxUpload=config.max_upload_bytes;$('upload-limit').textContent=Math.floor(state.maxUpload/1024/1024);$('connection-text').textContent='Сервер доступен';restore();}).catch(()=>{$('connection-dot').style.background='#dba55a';$('connection-text').textContent='Нет связи с сервером';});
+
+
+// VISUAL_SYNC_V2_BEGIN — shared SSE state for the image and the electronic receipt.
+// No timers simulate OCR progress. Row cards are an animation of ALREADY received OCR text.
+const VisualSync = {
+  scanTarget: null,
+  scanPassUsed: false,
+  queued: [],
+  seen: new Set(),
+  queueTimer: null,
+  activeToken: 0,
+  reset(){
+    clearTimeout(this.queueTimer);this.queueTimer=null;
+    this.queued.length=0;this.seen.clear();this.stopScan();
+    this.activeToken=state.token;
+    document.querySelectorAll('.receipt-transfer').forEach(el=>el.remove());
+  },
+  finished(){this.stopScan();},
+  startScan(target){
+    this.stopScan();
+    this.scanTarget=target;this.scanPassUsed=false;
+    state.visualScanTarget=target;state.visualScanPassed=false;
+    const asset=state.assets.get(target);
+    if(asset){asset.card.classList.add('scan-running');drawAsset(asset);}
+  },
+  stopScan(){
+    const target=this.scanTarget;
+    this.scanTarget=null;state.visualScanTarget=null;state.visualScanPassed=false;
+    if(target){const asset=state.assets.get(target);if(asset){asset.card.classList.remove('scan-running');drawAsset(asset);}}
+  },
+  rowReady(row){
+    if(!row||!Number.isInteger(Number(row.row))||!['product','tax','service'].includes(row.kind))return;
+    const id=Number(row.row);
+    if(this.seen.has(id)||(!row.name&&!row.quantity&&!row.price))return;
+    this.seen.add(id);this.queued.push({...row,row:id});
+    this.pump();
+  },
+  pump(){
+    if(this.queueTimer!==null||!this.queued.length)return;
+    const token=state.token;
+    const next=()=>{
+      this.queueTimer=null;
+      if(token!==state.token){this.queued.length=0;return;}
+      const row=this.queued.shift();if(!row)return;
+      // The table and its cell coordinates may arrive after the event; defer briefly.
+      const asset=state.assets.get('rectified');
+      const hasSource=!!asset?.overlay.querySelector(`.cell-box[data-row="${row.row}"]`);
+      const hasTarget=[...$('receipt-body').children].some(el=>Number(el.dataset.row)===row.row);
+      if(hasSource&&hasTarget){
+        focusRow(row.row);
+        animateRowTransfer({row:row.row,kind:row.kind,name_raw:row.name,
+          quantity_raw:row.quantity,price_raw:row.price});
+        if(!state.result)$('process-subtitle').textContent=row.kind==='tax'
+          ?'Прочитана строка НДС · ожидает проверки'
+          :`Получена строка №${row.row} · название, количество и цена пока не проверены`;
+      }
+      // Missing layout or table is not a reason to invent a source position.
+      this.queueTimer=setTimeout(next,this.queued.length>18?160:300);
+    };
+    next();
+  },
+  handle(event){
+    if(event.schema!=='visual-sync-2.0')return;
+    switch(event.action){
+      case 'scan_start':this.startScan(event.target);break;
+      case 'scan_stop':this.stopScan();break;
+      case 'row_ready':this.rowReady(event.row);break;
+      case 'geometry_found':
+      case 'geometry_ready':
+      case 'rows_ready':
+      case 'checking':
+      case 'matching':
+        if(event.message)$('process-subtitle').textContent=event.message;
+        break;
+    }
+  }
+};
+// VISUAL_SYNC_V2_END
+
+
+
+
+// RECEIPT_START_SCREEN_V1_BEGIN
+// Uses the app's existing upload(file) and paste event. No duplicate upload pipeline.
+(function initReceiptStartScreen(){
+  const zone = document.getElementById('drop-zone');
+  const pasteButton = document.getElementById('paste-main');
+  const overlay = document.getElementById('receipt-waiting-overlay');
+  const resultScroll = document.getElementById('output-scroll');
+  if(!zone || !pasteButton || !overlay || !resultScroll)return;
+
+  // Restored jobs can start with the upload zone hidden; a MutationObserver catches
+  // both an upload and a restored job without touching App's reset/restore logic.
+  function syncWaitingState(){
+    const waiting = !window.ReceiptUploadGate?.ready;
+    document.body.classList.toggle('awaiting-receipt', waiting);
+    overlay.setAttribute('aria-hidden', String(!waiting));
+    resultScroll.inert = waiting;
+  }
+  new MutationObserver(syncWaitingState).observe(zone, {
+    attributes: true, attributeFilter: ['hidden']
+  });
+  window.addEventListener('receipt-gate-change',syncWaitingState);
+  syncWaitingState();
+
+  pasteButton.addEventListener('click', async function(event){
+    event.preventDefault();
+    event.stopPropagation(); // The whole drop zone is also clickable.
+    if(pasteButton.disabled)return;
+    if(!navigator.clipboard || typeof navigator.clipboard.read !== 'function'){
+      toast('Браузер не разрешает чтение буфера кнопкой. Нажмите Ctrl+V.');
+      return;
+    }
+    pasteButton.disabled = true;
+    try {
+      const items = await navigator.clipboard.read();
+      const allowed = ['image/png','image/jpeg','image/webp'];
+      let imageFile = null;
+      for(const item of items){
+        const type = allowed.find(t=>item.types.includes(t));
+        if(!type)continue;
+        const blob = await item.getType(type);
+        if(!blob.size)continue;
+        const ext = {'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[type];
+        imageFile = new File([blob], `clipboard-${Date.now()}.${ext}`, {type});
+        break;
+      }
+      if(!imageFile){
+        toast('В буфере нет изображения. Скопируйте фото чека и попробуйте снова.');
+        return;
+      }
+      await upload(imageFile);
+    } catch(error){
+      // Browser permission can be denied even on localhost. Ctrl+V already works.
+      toast('Не получилось прочитать буфер. Вставьте фото клавишами Ctrl+V.');
+    } finally {
+      pasteButton.disabled = false;
+    }
+  });
+})();
+// RECEIPT_START_SCREEN_V1_END
+
+
+// RECEIPT_UPLOAD_GATE_V11_BEGIN — только события существующего upload(), SSE и DOM.
+window.ReceiptUploadGate = (() => {
+  let ready=false;
+  let stateName='idle';
+  let currentToken=null;
+  let acceptedToken=null;
+  let shownToken=null;
+  let badgeTimer=null;
+
+  const copy={
+    idle:['Загрузите чек Торгсофта','Электронный чек появится после обнаружения товарной таблицы.'],
+    uploading:['Загружаем фото чека','Проверяем, что фотография успешно передана на сервер.'],
+    searching:['Фото получено','Ищем товарную таблицу. Электронный чек станет доступен после обнаружения её строк.'],
+    failed:['Таблица пока не найдена','Не удалось продолжить обработку. Проверьте фото или загрузите другой чек.'],
+  };
+  const notify=() => window.dispatchEvent(new Event('receipt-gate-change'));
+  function updateCopy(){
+    const pair=copy[stateName]||copy.idle;
+    const title=document.getElementById('receipt-gate-title');
+    const message=document.getElementById('receipt-gate-description');
+    if(title)title.textContent=pair[0];
+    if(message)message.textContent=pair[1];
+  }
+  function transition(next){stateName=next;updateCopy();notify();}
+  function clearBadge(){
+    if(badgeTimer!==null){clearTimeout(badgeTimer);badgeTimer=null;}
+    document.querySelectorAll('.receipt-upload-check').forEach(el=>el.remove());
+  }
+  function showBadge(){
+    if(acceptedToken===null||acceptedToken!==currentToken||shownToken===currentToken)return;
+    const original=state.assets?.get('original');
+    if(!original?.stage)return;
+    shownToken=currentToken;
+    const badge=document.createElement('div');
+    badge.className='receipt-upload-check';
+    badge.setAttribute('role','status');badge.setAttribute('aria-label','Фото чека загружено');
+    const circle=document.createElement('span');circle.className='receipt-upload-check-icon';
+    circle.append(icon('check'));
+    badge.append(circle,document.createTextNode('Фото загружено'));
+    original.stage.append(badge);
+    badgeTimer=setTimeout(()=>{
+      badge.classList.add('receipt-upload-leave');
+      badgeTimer=setTimeout(()=>{badge.remove();badgeTimer=null;},310);
+    },1900);
+  }
+  function reset(){
+    clearBadge();ready=false;stateName='idle';currentToken=null;
+    acceptedToken=null;shownToken=null;transition('idle');
+  }
+  function begin(token){
+    clearBadge();ready=false;currentToken=token;acceptedToken=null;
+    shownToken=null;transition('uploading');
+  }
+  function accepted(token){
+    if(token!==state.token||token!==currentToken)return;
+    acceptedToken=token;
+    transition('searching');
+    showBadge();
+  }
+  function asset(key){if(key==='original')showBadge();}
+  function hasTableCells(cells){
+    if(!Array.isArray(cells)||!cells.length)return false;
+    const rows=new Map();
+    for(const cell of cells){
+      if(!cell||!Number.isInteger(Number(cell.row))||!Array.isArray(cell.box)||cell.box.length!==4)continue;
+      if(!['number','name','quantity','price'].includes(cell.role))continue;
+      const valid=cell.box.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite));
+      if(!valid)continue;
+      if(!rows.has(cell.row))rows.set(cell.row,new Set());
+      rows.get(cell.row).add(cell.role);
+    }
+    return [...rows.values()].some(roles=>['number','name','quantity','price'].every(role=>roles.has(role)));
+  }
+  function tableReady(){
+    if(ready)return;
+    ready=true;transition('ready');
+  }
+  function onPipeline(event){
+    if(!event||ready)return;
+    // A contour or a phase alone does NOT unlock the result.
+    if(event.type==='cells'&&hasTableCells(event.cells))tableReady();
+    else if(event.type==='draft_rows'&&Array.isArray(event.rows)&&event.rows.some(
+        row=>row?.kind==='product'&&String(row.name_raw??row.name??'').trim()))tableReady();
+  }
+  function finished(result){
+    // Restore of an already completed job has no SSE history in the current browser.
+    if(result&&Array.isArray(result.rows)&&result.rows.length)tableReady();
+  }
+  function restored(job){
+    clearBadge();currentToken=state.token;acceptedToken=null;shownToken=null;
+    ready=false;
+    if(job?.status==='done')finished(job.result);
+    else if(job?.status==='failed')transition('failed');
+    else transition('searching');
+  }
+  function failed(message){
+    if(ready)return;
+    transition('failed');
+    const desc=document.getElementById('receipt-gate-description');
+    if(desc&&message)desc.textContent=String(message).slice(0,250)+' Загрузите новое фото.';
+  }
+  updateCopy();
+  return {get ready(){return ready;},reset,begin,accepted,asset,hasTableCells,
+          tableReady,onPipeline,finished,restored,failed};
+})();
+window.dispatchEvent(new Event('receipt-gate-change'));
+// RECEIPT_UPLOAD_GATE_V11_END
+
+// RECEIPT_IDLE_INVITATION_V1_BEGIN — UI-only, no timers tied to OCR or upload.
+(function receiptIdleInvitation(){
+  const zone=document.getElementById('drop-zone');
+  const landing=document.querySelector('.receipt-idle-landing');
+  const label=document.querySelector('.receipt-waiting-card strong');
+  if(!zone || !landing || !label)return;
+  const xmlns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(xmlns,'svg');
+  svg.classList.add('receipt-idle-guide');
+  svg.setAttribute('aria-hidden','true');
+  svg.setAttribute('focusable','false');
+  const halo=document.createElementNS(xmlns,'path');halo.classList.add('receipt-idle-guide-halo');
+  const arc=document.createElementNS(xmlns,'path');arc.classList.add('receipt-idle-guide-path');
+  const head=document.createElementNS(xmlns,'path');head.classList.add('receipt-idle-guide-tip');
+  svg.append(halo,arc,head);document.body.appendChild(svg);
+  let frame=0;
+  let active=false;
+  const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  function geometry(){
+    frame=0;
+    if(!active || window.innerWidth<=760 || !label.isConnected || !zone.isConnected){
+      svg.classList.remove('receipt-idle-guide-on');return;
+    }
+    const src=label.getBoundingClientRect();
+    const dest=zone.getBoundingClientRect();
+    // Начало непосредственно у левого края надписи справа;
+    // наконечник направлен к правой стороне зоны загрузки слева.
+    const sx=src.left-13,sy=src.top+src.height*.52;
+    const ex=dest.right-Math.min(65,dest.width*.12);
+    const ey=dest.top+Math.min(120,dest.height*.23);
+    if(sx-ex<90){svg.classList.remove('receipt-idle-guide-on');return;}
+    const d=`M ${sx.toFixed(1)} ${sy.toFixed(1)} C ${(sx-85).toFixed(1)} ${sy.toFixed(1)}, ${(ex+80).toFixed(1)} ${(ey-12).toFixed(1)}, ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    halo.setAttribute('d',d);arc.setAttribute('d',d);
+    head.setAttribute('d',`M ${(ex+13).toFixed(1)} ${(ey-8).toFixed(1)} L ${ex.toFixed(1)} ${ey.toFixed(1)} L ${(ex+14).toFixed(1)} ${(ey+7).toFixed(1)}`);
+    svg.classList.add('receipt-idle-guide-on');
+  }
+  function schedule(){if(!frame)frame=requestAnimationFrame(geometry);}
+  function refresh(){
+    // Показываем анимацию только пока у пользователя нет фото.
+    // Скрываем при начале upload(), когда drop-zone становится hidden.
+    const next=!zone.hidden && !document.querySelector('#image-list .image-card');
+    active=next;
+    document.body.classList.toggle('receipt-idle-active',next);
+    if(next)schedule();else svg.classList.remove('receipt-idle-guide-on');
+  }
+  new MutationObserver(refresh).observe(zone,{attributes:true,attributeFilter:['hidden']});
+  // Копия правой панели может меняться в Upload Gate v1.1.
+  window.addEventListener('receipt-gate-change',refresh);
+  window.addEventListener('resize',schedule,{passive:true});
+  window.addEventListener('scroll',schedule,{passive:true,capture:true});
+  const resizer=typeof ResizeObserver==='function'?new ResizeObserver(schedule):null;
+  if(resizer){resizer.observe(label);resizer.observe(zone);}
+  motion.addEventListener?.('change',schedule);
+  refresh();
+})();
+// RECEIPT_IDLE_INVITATION_V1_END
 

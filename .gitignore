@@ -22,6 +22,9 @@ models/
 # Experiments and dev playgrounds (local only, not published to GitHub)
 experiments/
 web_activity/
+receipt_idle_invitation_demo/
+visual_sync_assets/
+tests/fixtures/
 
 # Backup archives and editor/system files
 *.zip
