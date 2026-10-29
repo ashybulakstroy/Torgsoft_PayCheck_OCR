@@ -35,10 +35,11 @@ def test_missing_quantity_prevents_vat_and_total_verification():
     assert result["calculation"]["vat"]["expected_tax"] is None
 
 
-def test_printed_rate_overrides_document_default():
+def test_printed_rate_does_not_override_configured_default():
     result = update_receipt(document(vat="12",total="112",label="НДС 12 %"))
-    assert result["calculation"]["validation_status"]=="match"
-    assert result["calculation"]["vat"]["rate_source"]=="printed_label"
+    assert result["calculation"]["validation_status"]=="vat_mismatch"
+    assert result["calculation"]["vat"]["rate_percent"]=="16"
+    assert result["calculation"]["vat"]["rate_source"] in {"default_16_percent","env_file"}
 
 
 def test_no_vat_row_is_not_a_failed_check():
@@ -57,11 +58,11 @@ def test_correcting_tax_clears_error_and_restores_finalization():
     assert not result["rows"][1]["needs_review"]
 
 
-def test_explicit_rate_disagreement_requires_review():
+def test_mixed_printed_rates_are_ignored_for_calculation():
     value=document(label="НДС 16 %")
     value["rows"].append(dict(row=3,kind="tax",name_raw="НДС 12 %",quantity_raw="1",price_raw="1"))
     result=update_receipt(value)
-    assert result["calculation"]["vat"]["status"]=="invalid_rate"
+    assert result["calculation"]["vat"]["status"]=="mismatch"
     assert not result["can_finalize"]
 
 

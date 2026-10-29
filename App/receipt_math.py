@@ -19,18 +19,14 @@ def verify_vat(rows,taxable_base,actual_tax,parse_number,default_rate="16"):
                   expected_tax=None,difference=None,rate_percent=None,rate_source=None,rows=[row["row"] for row in taxes])
     if not taxes:
         return result
-    rates = []
-    explicit = False
-    for row in taxes:
-        label = str(row.get("name_raw",""))
-        match = re.search(r"(?<!\d)(\d{1,3}(?:[.,]\d+)?)\s*%",label)
-        explicit = explicit or bool(match)
-        rates.append(parse_number(match.group(1) if match else default_rate))
-    if any(rate is None or rate>100 for rate in rates) or len(set(rates))!=1:
-        result.update(status="invalid_rate",reason="Ставка НДС не определена однозначно")
+    # The photographed label is OCR evidence, not configuration: the printed
+    # percentage can itself be misread. Numeric recovery verifies against the
+    # configured application rate instead.
+    rate = parse_number(default_rate)
+    if rate is None or rate > 100:
+        result.update(status="invalid_rate",reason="Недействительная ставка НДС в конфигурации")
         return result
-    rate = rates[0]
-    result.update(rate_percent=format(rate,"f"),rate_source="printed_label" if explicit else "receipt_default")
+    result.update(rate_percent=format(rate,"f"),rate_source="env_file")
     if any(row.get("invalid_fields") for row in rows if row["kind"] in {"product","service","tax"}):
         result.update(status="incomplete",reason="Не все количества и цены прочитаны для проверки НДС")
         return result

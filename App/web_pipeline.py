@@ -30,6 +30,7 @@ from App.manual_mappings import ManualMappings
 from App.quantity_cells import recover_quantities
 from App.numeric_cell_split import recover as recover_numeric_cells
 from App.row_cell_split import repair as split_merged_product_rows
+from App.numeric_recovery import recover_numeric_receipt
 
 MAX_PIXELS = 25_000_000
 
@@ -379,6 +380,23 @@ class ReceiptPipeline:
         split_count = sum(item['applied'] for item in numeric_split)
         if split_count:
             job.publish('message',title=f'Количество и цена разделены по исходному OCR: {split_count}; сумма и НДС проверены',progress=78)
+        job.publish('message',title='Проверяем сумму НДС и итог чека',progress=78)
+        recovered_receipt=None
+        try:
+            recovered_receipt,numeric_report=recover_numeric_receipt(
+                dict(rows=rows,total_raw=total),rectified,layout,aligned,
+                lambda images:self.engine.text_recognizer(images)[0],ocr_lock=self.ocr_lock)
+            rows,total=recovered_receipt['rows'],recovered_receipt['total_raw']
+            job.json_file('numeric_recovery.json',numeric_report)
+            if numeric_report['vat_triggered']:
+                job.publish('message',title='Дополнительно проверена сумма НДС',progress=78)
+            if numeric_report['total_triggered']:
+                job.publish('message',title='Повторно проверены количество, цены, НДС и итог',progress=79)
+            if numeric_report['applied_count']:
+                job.publish('message',title=f"Уточнено числовых полей: {numeric_report['applied_count']}",progress=79)
+        except Exception as error:
+            job.json_file('numeric_recovery.json',dict(status='error',detail=str(error)))
+            job.publish('message',title='Повторная проверка чисел недоступна; исходный OCR сохранён',progress=79)
         cells = grid_cells(layout, rows)
         job.json_file("layout.json", dict(layout=layout, cells=cells, segmentation=segmentation))
         job.publish("cells", target="rectified", cells=cells, title="Ячейки выделены, НДС — отдельная строка", progress=79)
@@ -430,6 +448,9 @@ class ReceiptPipeline:
                       raw_text="\n".join(line["text"] for line in lines),
                       downloads={key:f"/api/jobs/{job.id}/files/{name}" for key, name in
                                  (("json", "receipt.json"), ("csv", "receipt.csv"), ("text", "ocr_rectified.txt"))})
+        if recovered_receipt and recovered_receipt.get('expected_total_source')=='numeric_recovery':
+            for key in ('expected_total','expected_total_source','expected_total_ocr'):
+                result[key]=recovered_receipt[key]
         emit_status(job, "check", "Проверяем цены, НДС и итог",
                     details="Вычисляем суммы по прочитанным строкам")
         update_receipt(result)

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 
 from App.receipt_math import verify_vat
+from App.numeric_settings import load_numeric_settings
 
 PAYABLE = {"product", "service", "tax"}
 CENT = Decimal(".01")
@@ -120,8 +121,12 @@ def update_receipt(receipt):
         status = "missing_original_total"
     else:
         status = "match" if computed == expected.quantize(CENT, rounding=ROUND_HALF_UP) else "mismatch"
+    settings = load_numeric_settings()
+    receipt["vat_rate_percent"] = settings["vat_rate_percent"]
+    receipt["vat_rate_source"] = settings["vat_rate_source"]
     vat = verify_vat(receipt["rows"],totals["product"]+totals["service"],totals["tax"],parse_number,
-                     receipt.get("vat_rate_percent","16"))
+                     settings["vat_rate_percent"])
+    vat["rate_source"] = settings["vat_rate_source"]
     for row in receipt["rows"]:
         if row["kind"]=="tax":
             row["vat_status"] = vat["status"]
