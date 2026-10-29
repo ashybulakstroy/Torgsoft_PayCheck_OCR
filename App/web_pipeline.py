@@ -15,10 +15,10 @@ from PIL import Image, ImageOps
 from rapidocr_onnxruntime import RapidOCR
 from rapidfuzz import fuzz, process
 
-from experiments.ocr_activity import preliminary_row_count, completed_text_rows, row_totals, emit_status
-from experiments.visual_sync import emit as emit_visual, raw_row as visual_raw_row
+from App.ocr_activity import preliminary_row_count, completed_text_rows, row_totals, emit_status
+from App.visual_sync import emit as emit_visual, raw_row as visual_raw_row
 from App.receipt_rectification import rectify_table
-from experiments.receipt_orientation_detector import orient_receipt
+from App.receipt_orientation_detector import orient_receipt
 from App.rotation_rectification import rotate_table_crop
 from App.ocr_catalog_eval import (ROOT, PASS_SIMILARITY, CatalogMatcher, aligned_lines,
                                   choose_row_boundaries, enforce_cell_boundaries, load_catalog,
@@ -31,6 +31,7 @@ from App.quantity_cells import recover_quantities
 from App.numeric_cell_split import recover as recover_numeric_cells
 from App.row_cell_split import repair as split_merged_product_rows
 from App.numeric_recovery import recover_numeric_receipt
+from App.selective_number_ocr import recover_number_cells
 
 MAX_PIXELS = 25_000_000
 
@@ -359,6 +360,18 @@ class ReceiptPipeline:
         restored_count = sum(item['applied'] for item in row_split_check)
         if restored_count:
             job.publish('message',title=f'Склеенные товарные строки разделены: {restored_count}; печатная граница, числа и итог проверены',progress=76)
+        rows, number_report = recover_number_cells(
+            rectified, rows, layout,
+            lambda crops: self.engine.text_recognizer(crops)[0],
+            ocr_lock=self.ocr_lock,
+        )
+        job.json_file('selective_number_ocr.json', number_report)
+        if number_report['recovered']:
+            job.publish(
+                'message',
+                title=f"Номера строк прочитаны отдельно: {number_report['recovered']}",
+                progress=76,
+            )
         emit_status(job, "check", "Проверяем количество и цены", details="Уточняем неоднозначные значения")
         with self.ocr_lock:
             recovered,quantity_check,_ = recover_quantities(dict(rows=rows,total_raw=total),rectified,layout,
@@ -380,6 +393,7 @@ class ReceiptPipeline:
         split_count = sum(item['applied'] for item in numeric_split)
         if split_count:
             job.publish('message',title=f'Количество и цена разделены по исходному OCR: {split_count}; сумма и НДС проверены',progress=78)
+        job.phase('numeric',78,'Проверяем сумму НДС и числовые поля')
         job.publish('message',title='Проверяем сумму НДС и итог чека',progress=78)
         recovered_receipt=None
         try:
@@ -451,6 +465,7 @@ class ReceiptPipeline:
         if recovered_receipt and recovered_receipt.get('expected_total_source')=='numeric_recovery':
             for key in ('expected_total','expected_total_source','expected_total_ocr'):
                 result[key]=recovered_receipt[key]
+        job.phase('assemble',97,'Собираем электронный чек')
         emit_status(job, "check", "Проверяем цены, НДС и итог",
                     details="Вычисляем суммы по прочитанным строкам")
         update_receipt(result)

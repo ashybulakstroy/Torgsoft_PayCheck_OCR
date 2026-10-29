@@ -5,7 +5,8 @@ const $ = id => document.getElementById(id);
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const state = {job:null, stream:null, assets:new Map(), rows:new Map(), result:null, token:0,
   maxUpload:20*1024*1024, activePhase:null, completed:new Set(), reviewOnly:false, selectedRow:null, blob:null,
-  editingRow:null, selectedCatalog:null, searchToken:0, saving:false, passSimilarity:87, totalFocused:false};
+  editingRow:null, selectedCatalog:null, searchToken:0, saving:false, passSimilarity:87, totalFocused:false,
+  lastEventId:0};
 const stepKeys = ['geometry','ocr','layout','matching'];
 function productLabel(count){const n=count%100;return count+' '+(n>=11&&n<=14?'товаров':count%10===1?'товар':count%10>=2&&count%10<=4?'товара':'товаров');}
 function node(tag, className='', text=''){const element=document.createElement(tag);element.className=className;if(text!==undefined)element.textContent=text;return element;}
@@ -13,6 +14,30 @@ function icon(id){const svg=document.createElementNS(SVG_NS,'svg');const use=doc
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').hidden=true,5000);}
 function setPill(text, kind){$('result-state').textContent=text;$('result-state').className='pill '+kind;}
 function setProgress(value){const progress=Math.max(0,Math.min(100,value));$('progress-fill').style.width=progress+'%';$('progress-label').textContent=progress+'%';document.querySelector('[role=progressbar]').setAttribute('aria-valuenow',progress);}
+function resetWebProgress(){
+  state.lastEventId=0;
+  $('progress-history').replaceChildren(node('li','empty','Этапы появятся после загрузки фотографии.'));
+  $('progress-preview').removeAttribute('src');$('progress-preview-wrap').hidden=true;
+  $('progress-preview-wrap').className='web-progress-preview';delete $('progress-preview-wrap').dataset.effect;
+}
+function renderWebProgress(event){
+  const history=$('progress-history');history.querySelector('.empty')?.remove();
+  const key=String(event.stage_id??event.id??event.stage);
+  let item=history.querySelector(`li[data-stage-id="${CSS.escape(key)}"]`);
+  if(!item){item=node('li');item.dataset.stageId=key;item.append(node('span','mark','…'),node('span','label',event.label||event.stage),node('small'));history.append(item);}
+  item.className=event.status||'running';item.querySelector('.mark').textContent=event.status==='done'?'✓':event.status==='error'?'!':'…';
+  item.querySelector('.label').textContent=event.detail||event.label||event.stage;
+  item.querySelector('small').textContent=event.elapsed_ms==null?'':`${Number(event.elapsed_ms).toFixed(0)} мс`;
+  item.scrollIntoView({block:'nearest'});
+  const preview=$('progress-preview-wrap');
+  if(event.status==='running'){preview.classList.add('running');preview.dataset.effect=event.effect||'';$('progress-preview-label').textContent=event.label||'';}
+  else if(preview.dataset.effect===(event.effect||preview.dataset.effect)){preview.classList.remove('running');}
+}
+function updateProgressPreview(artifact){
+  if(!artifact?.url)return;
+  const wrap=$('progress-preview-wrap');$('progress-preview').src=artifact.url;wrap.hidden=false;
+  $('progress-preview-label').textContent=artifact.title||'Промежуточное изображение';
+}
 function setPhase(phase, title){
   if(state.activePhase&&phase!==state.activePhase&&stepKeys.includes(state.activePhase))state.completed.add(state.activePhase);
   state.completed.delete(phase);state.activePhase=phase;
@@ -160,7 +185,12 @@ function startTransferFlow(){
 }
 function addArtifact(data){
   let asset=state.assets.get(data.key);
-  if(asset){Object.assign(asset,data);asset.img.src=data.url;asset.heading.textContent=data.title;asset.subtitle.textContent=data.subtitle||'';asset.dimensions.textContent=`${data.width} × ${data.height} px`;drawAsset(asset);return;}
+  if(asset){
+    const dom={card:asset.card,heading:asset.heading,subtitle:asset.subtitle,stage:asset.stage,
+               img:asset.img,overlay:asset.overlay,dimensions:asset.dimensions};
+    Object.assign(asset,data,dom);asset.img.src=data.url;asset.heading.textContent=data.title;
+    asset.subtitle.textContent=data.subtitle||'';asset.dimensions.textContent=`${data.width} × ${data.height} px`;drawAsset(asset);return;
+  }
   const card=node('article','image-card'+(['header','crop'].includes(data.key)?' debug-only':''));card.dataset.key=data.key;
   const header=node('div','image-card-header');const headings=node('div');const heading=node('h3','',data.title);const subtitle=node('p','',data.subtitle||'');headings.append(heading,subtitle);
   header.append(headings,node('span','operation-tag',data.role==='original'?'SOURCE':data.key.toUpperCase()));
@@ -208,10 +238,13 @@ function makeReceiptRow(row,ordinal){
   const tr=node('tr',(lowMatch?'needs-check ':row.kind!=='product'?'special-row ':'')+(draft?'ocr-draft':''));tr.dataset.row=row.row;
   if(row.kind==='tax'&&row.vat_status)tr.classList.add(row.vat_status==='match'?'vat-passed':'vat-failed');
   tr.addEventListener('mouseenter',()=>focusRow(row.row,true));tr.addEventListener('click',()=>{focusRow(row.row,true);if(state.result)editRow(row.row);state.assets.get('rectified')?.card.scrollIntoView({behavior:'smooth',block:'nearest'});});
-  const printedNumber=String(row.item_number_raw??'').trim();
+  const rawPrintedNumber=String(row.item_number_raw??'').trim();
+  const recoveredNumber=String(row.item_number_recovered??'').trim();
+  const printedNumber=/^\d+$/.test(rawPrintedNumber)?rawPrintedNumber:recoveredNumber;
   const hasPrintedNumber=/^\d+$/.test(printedNumber)&&Number(printedNumber)>0;
   const numberCell=node('td',hasPrintedNumber?'':'inferred-number',hasPrintedNumber?printedNumber:String(ordinal));
-  if(!hasPrintedNumber)numberCell.title='Номер не распознан: указан порядковый номер строки таблицы.';
+  if(recoveredNumber&&printedNumber===recoveredNumber)numberCell.title='Номер повторно прочитан только из ячейки №.';
+  else if(!hasPrintedNumber)numberCell.title='Номер не распознан: указан порядковый номер строки таблицы.';
   tr.append(numberCell);
   const description=node('td');const kindNames={tax:'НДС',service:row.name_raw||'Доставка',total:'Итог',unreadable:'Не удалось прочитать название'};
   const name=row.name??row.name_raw;
@@ -338,7 +371,7 @@ function reset(){
   renderMath.previousStatus=null;clearTimeout(showMathSuccess.timer);document.querySelector('.math-success-flash')?.remove();
   stopTransferFlow();
   document.querySelectorAll('.receipt-transfer').forEach(card=>card.remove());
-  state.token++;state.stream?.close();state.stream=null;state.job=null;state.assets.clear();state.rows.clear();state.result=null;state.completed.clear();state.activePhase=null;state.selectedRow=null;state.reviewOnly=false;
+  state.token++;state.stream?.close();state.stream=null;state.job=null;state.assets.clear();state.rows.clear();state.result=null;state.completed.clear();state.activePhase=null;state.selectedRow=null;state.reviewOnly=false;resetWebProgress();
   if(state.blob){URL.revokeObjectURL(state.blob);state.blob=null;}
   state.totalFocused=false;state.editingRow=null;state.selectedCatalog=null;state.searchToken++;$('editor-panel').hidden=true;$('editor-panel').open=false;$('math-panel').hidden=true;
   document.querySelector('.receipt-total').classList.remove('math-passed','math-failed');document.querySelector('.receipt-total').removeAttribute('title');
@@ -373,10 +406,13 @@ function finish(result){
   if(result.warnings?.length){$('geometry-note').hidden=false;$('geometry-note').textContent=result.warnings.some(w=>w.includes('не удалось'))?result.warnings.join(' · '):'Граница таблицы содержит неоднозначные участки. Проверьте результат выпрямления по исходному фото.';}
 }
 function consume(event){
+  if(event.id&&event.id<=state.lastEventId)return;
+  if(event.id)state.lastEventId=event.id;
   window.ReceiptUploadGate?.onPipeline(event);
   if(event.progress!==undefined)setProgress(event.progress);
-  if(event.type==='phase'){setPhase(event.phase==='layout'&&event.progress<50?'geometry':event.phase,event.title);window.OcrActivity?.phase(event.phase,event.title);logEvent(event.title);}
-  else if(event.type==='artifact'){addArtifact(event.artifact);logEvent(event.artifact.title);}
+  if(event.type==='stage'){renderWebProgress(event);}
+  else if(event.type==='phase'){setPhase(event.phase==='layout'&&event.progress<50?'geometry':event.phase,event.title);window.OcrActivity?.phase(event.phase,event.title);logEvent(event.title);}
+  else if(event.type==='artifact'){addArtifact(event.artifact);updateProgressPreview(event.artifact);logEvent(event.artifact.title);}
   else if(event.type==='contour'){const asset=state.assets.get(event.target);if(asset){asset.contour=event.polygon;drawAsset(asset);}logEvent(event.title);}
   else if(event.type==='region'){const asset=state.assets.get(event.target);if(asset){asset.region=event.box;drawAsset(asset);}}
   else if(event.type==='boxes'){const asset=state.assets.get(event.target);if(asset){asset.boxes=event.boxes;drawAsset(asset); /* VISUAL_SYNC_V2: keep row cells during OCR */}logEvent(`${event.title}: ${event.boxes.length}`);}
@@ -387,7 +423,7 @@ function consume(event){
   else if(event.type==='visual'){VisualSync.handle(event);}
   else if(event.type==='message'){window.OcrActivity?.message(event.title);$('process-subtitle').textContent=event.title;logEvent(event.title);}
   else if(event.type==='ui_status'){window.OcrActivity?.uiStatus(event);$('process-subtitle').textContent=event.title;if(event.rows_total||event.matched_products!==undefined)logEvent(window.OcrActivity ? document.getElementById('ocr-activity-details').textContent : event.title);}
-  else if(event.type==='complete'){finish(event.result);logEvent('Обработка завершена');}
+  else if(event.type==='complete'){finish(event.result);$('progress-preview-wrap').classList.remove('running');logEvent('Обработка завершена');}
   else if(event.type==='error')showError(event.title);
   if(event.type!=='complete'&&event.type!=='error')followProcessing();
   // VISUAL_SYNC_V2: transfers are triggered by raw OCR row_ready events, not catalog matching.
@@ -400,7 +436,7 @@ function listen(jobId, token){
   state.stream.onerror=async()=>{
     if(token!==state.token)return;
     window.OcrActivity?.connectionLost();
-    try{const response=await fetch(`/api/jobs/${jobId}`);if(!response.ok)throw Error();const job=await response.json();if(job.status==='done')finish(job.result);else if(job.status==='failed')showError(job.error);else $('process-subtitle').textContent='Восстанавливаем связь с обработкой…';}catch{ $('process-subtitle').textContent='Нет связи с сервером. Ожидаем подключения…'; }
+    try{const response=await fetch(`/api/jobs/${jobId}`);if(!response.ok)throw Error();const job=await response.json();for(const event of job.events||[])consume(event);if(job.status==='done')finish(job.result);else if(job.status==='failed')showError(job.error);else $('process-subtitle').textContent='Восстанавливаем связь с обработкой…';}catch{ $('process-subtitle').textContent='Нет связи с сервером. Ожидаем подключения…'; }
   };
 }
 async function upload(file){
@@ -424,7 +460,7 @@ async function restore(){
   try{
     const response=await fetch(`/api/jobs/${id}`);if(!response.ok)return;const job=await response.json();if(token!==state.token)return;
     state.job=id;window.ReceiptUploadGate?.restored(job);$('drop-zone').hidden=true;$('empty-result').hidden=true;
-    job.artifacts.forEach(addArtifact);setProgress(job.progress);
+    job.artifacts.forEach(artifact=>{addArtifact(artifact);updateProgressPreview(artifact);});for(const event of job.events||[])if(event.type==='stage'){state.lastEventId=Math.max(state.lastEventId,event.id||0);renderWebProgress(event);}setProgress(job.progress);
     if(job.status==='done'){
       finish(job.result);
       logEvent('Восстановлен сохранённый результат: '+job.filename);
@@ -622,6 +658,7 @@ window.ReceiptUploadGate = (() => {
     idle:['Загрузите чек Торгсофта','Электронный чек появится после обнаружения товарной таблицы.'],
     uploading:['Загружаем фото чека','Проверяем, что фотография успешно передана на сервер.'],
     searching:['Фото получено','Ищем товарную таблицу. Электронный чек станет доступен после обнаружения её строк.'],
+    ready:['Фото принято','Показываем фактический ход обработки и формируем электронный чек.'],
     failed:['Таблица пока не найдена','Не удалось продолжить обработку. Проверьте фото или загрузите другой чек.'],
   };
   const notify=() => window.dispatchEvent(new Event('receipt-gate-change'));
@@ -665,7 +702,9 @@ window.ReceiptUploadGate = (() => {
   function accepted(token){
     if(token!==state.token||token!==currentToken)return;
     acceptedToken=token;
-    transition('searching');
+    // OCR_WEB_PROGRESS: a successful HTTP 202 is sufficient to open the
+    // progress panel. Receipt rows still appear only from real SSE events.
+    ready=true;transition('ready');
     showBadge();
   }
   function asset(key){if(key==='original')showBadge();}
@@ -699,10 +738,10 @@ window.ReceiptUploadGate = (() => {
   }
   function restored(job){
     clearBadge();currentToken=state.token;acceptedToken=null;shownToken=null;
-    ready=false;
+    ready=Boolean(job&&job.status!=='failed');
     if(job?.status==='done')finished(job.result);
     else if(job?.status==='failed')transition('failed');
-    else transition('searching');
+    else transition('ready');
   }
   function failed(message){
     if(ready)return;

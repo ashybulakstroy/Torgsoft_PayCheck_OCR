@@ -3,6 +3,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -41,12 +42,20 @@ def test_http_upload_sse_and_download(server):
     payloads = [json.loads(line[6:]) for line in content.splitlines() if line.startswith("data: ")]
     events = [payload for payload in payloads if "type" in payload]
     assert any(event["type"] == "artifact" for event in events)
+    stage_events = [event for event in events if event["type"] == "stage"]
+    assert any(event["stage"] == "queued" and event["status"] == "running" for event in stage_events)
+    assert any(event["stage"] == "geometry" and event["status"] == "done"
+               and event["elapsed_ms"] >= 0 for event in stage_events)
+    assert any(event["stage"] == "completed" and event["status"] == "done" for event in stage_events)
     assert events[-1]["type"] == "complete"
     assert "event: heartbeat\ndata: {}" in content
     assert events[-1]["progress"] == 100
     assert [event["id"] for event in events] == sorted({event["id"] for event in events})
     with urllib.request.urlopen(base+f"/api/jobs/{job_id}") as response:
-        assert json.load(response)["status"] == "done"
+        snapshot = json.load(response)
+        assert snapshot["status"] == "done"
+        assert snapshot["last_event_id"] == len(snapshot["events"])
+        assert any(event["type"] == "stage" for event in snapshot["events"])
     with urllib.request.urlopen(base+f"/api/jobs/{job_id}/files/receipt.json") as response:
         assert json.load(response)["product_count"] == 0
     with pytest.raises(urllib.error.HTTPError) as error:
@@ -126,6 +135,23 @@ def test_live_events_preserve_ocr_snapshot(tmp_path):
     job.publish("row", row=rows[0])
     assert job.events[0]["rows"][0]["name"] == "Исходный OCR"
     assert job.events[1]["row"]["name"] == "Товар справочника"
+
+
+def test_progress_ui_unlocks_after_accepted_202_and_has_real_history():
+    from App.web_server import STATIC
+    script = (STATIC/"app.js").read_text(encoding="utf-8")
+    page = (STATIC/"index.html").read_text(encoding="utf-8")
+    assert "ready=true;transition('ready')" in script
+    assert "event.type==='stage'" in script
+    assert "updateProgressPreview(event.artifact)" in script
+    assert 'id="progress-history"' in page
+    assert 'id="progress-preview"' in page
+
+
+def test_receipt_uses_targeted_number_before_visual_sequence_fallback():
+    script = (Path(__file__).resolve().parents[2] / 'App' / 'web' / 'app.js').read_text(encoding='utf-8')
+    assert 'row.item_number_recovered' in script
+    assert 'Номер повторно прочитан только из ячейки №.' in script
 
 
 def test_catalog_selection_api_trains_persistent_knowledge(server, tmp_path):

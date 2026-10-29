@@ -20,6 +20,7 @@ def main():
         page = context.new_page()
         errors = []
         page.on("pageerror", lambda error:errors.append(str(error)))
+        page.on("console", lambda message:errors.append(message.text) if message.type == "error" else None)
         page.goto("http://127.0.0.1:8023", wait_until="networkidle")
         page.screenshot(path=str(OUT / "empty.png"))
         first = ROOT / "data/in_data/WhatsApp Image 2026-10-24 at 13.33.50.jpeg"
@@ -29,7 +30,8 @@ def main():
         page.wait_for_function("state.result!==null", timeout=120000)
         result = page.evaluate("state.result")
         stream = page.request.get(f"http://127.0.0.1:8023/api/jobs/{result['job_id']}/events").text()
-        events = [json.loads(line[6:]) for line in stream.splitlines() if line.startswith("data: ")]
+        events = [event for line in stream.splitlines() if line.startswith("data: ")
+                  if (event := json.loads(line[6:])).get("type")]
         drafts = [event for event in events if event["type"] == "draft_rows"]
         assert len(drafts) >= 2
         assert all(row["stage"] == "ocr" and row["match"] is None for event in drafts for row in event["rows"])

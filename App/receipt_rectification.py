@@ -6,7 +6,7 @@ import numpy as np
 
 from App.contour_unwarp import build_contour_map
 from App.wave_dewarp import find_rules, rectify
-from experiments.dewarp_necessity_detector import assess_dewarp_necessity
+from App.dewarp_necessity_detector import assess_dewarp_necessity
 
 
 def rectify_table(image, polygon, *, trust_top=True):

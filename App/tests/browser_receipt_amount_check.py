@@ -5,7 +5,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[2]
-OUT=(Path("R:/TEMP") if Path("R:/TEMP").exists() else ROOT/"experiments/artifacts")/"quantity_cell_recovery"
+OUT=(Path("R:/TEMP") if Path("R:/TEMP").exists() else ROOT/"experiment_outputs")/"quantity_cell_recovery"
 
 
 def main():

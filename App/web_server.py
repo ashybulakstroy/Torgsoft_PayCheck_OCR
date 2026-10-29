@@ -13,7 +13,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from time import time
+from time import perf_counter, time
 from urllib.parse import parse_qs, unquote, urlparse
 
 import cv2
@@ -35,22 +35,47 @@ class Job:
         self.result, self.artifacts, self.events = None, [], []
         self.created_at = time()
         self.condition = threading.Condition()
+        self.active_stage = None
+        self.active_stage_title = ""
+        self.active_stage_started = None
+        self.stage_sequence = 0
 
     def public(self):
         return dict(id=self.id, filename=self.filename, status=self.status, progress=self.progress,
-                    error=self.error, result=self.result, artifacts=self.artifacts, created_at=self.created_at)
+                    error=self.error, result=self.result, artifacts=self.artifacts, created_at=self.created_at,
+                    events=copy.deepcopy(self.events), last_event_id=len(self.events))
 
     def publish(self, event_type, **payload):
         with self.condition:
             if "progress" in payload:
                 self.progress = max(self.progress, int(payload["progress"]))
                 payload["progress"] = self.progress
-            event = dict(type=event_type, id=len(self.events)+1, **copy.deepcopy(payload))
+            event = dict(type=event_type, id=len(self.events)+1, at=time(), **copy.deepcopy(payload))
             self.events.append(event)
             self.condition.notify_all()
 
     def phase(self, phase, progress, title):
+        self.finish_stage("done")
+        self.stage_sequence += 1
+        self.active_stage = phase
+        self.active_stage_title = title
+        self.active_stage_started = perf_counter()
+        effect = {"input":"decode","geometry":"perspective","layout":"grid","ocr":"scan",
+                  "numeric":"numbers","matching":"table","assemble":"table","queued":"upload"}.get(phase,"")
+        self.publish("stage", stage=phase, stage_id=self.stage_sequence, label=title,
+                     effect=effect, status="running", elapsed_ms=None, progress=progress)
         self.publish("phase", phase=phase, progress=progress, title=title)
+
+    def finish_stage(self, status="done", detail=""):
+        if self.active_stage is None:
+            return
+        elapsed = round((perf_counter()-self.active_stage_started)*1000, 1)
+        self.publish("stage", stage=self.active_stage, stage_id=self.stage_sequence,
+                     label=self.active_stage_title, status=status, detail=detail,
+                     elapsed_ms=elapsed, progress=self.progress)
+        self.active_stage = None
+        self.active_stage_title = ""
+        self.active_stage_started = None
 
     def json_file(self, name, data):
         (self.directory / name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -87,7 +112,7 @@ class JobStore:
             try:
                 state = json.loads(state_file.read_text(encoding="utf-8"))
                 job = Job(state_file.parent.name, state["filename"], state_file.parent)
-                for key in ("status", "progress", "error", "result", "artifacts", "created_at"):
+                for key in ("status", "progress", "error", "result", "artifacts", "created_at", "events"):
                     if key in state:
                         setattr(job, key, state[key])
                 if job.status not in {"done", "failed"}:
@@ -110,7 +135,7 @@ class JobStore:
         job.persist()
         with self.lock:
             self.jobs[job_id] = job
-        job.publish("phase", phase="queued", title="Фото загружено. Ожидаем обработку", progress=1)
+        job.phase("queued", 1, "Фото загружено. Ожидаем обработку")
         self.pool.submit(self._process, job)
         return job
 
@@ -119,12 +144,17 @@ class JobStore:
         try:
             result = self.processor(job)
             with job.condition:
+                job.finish_stage("done")
                 job.result, job.status = result, "done"
+                job.publish("stage", stage="completed", stage_id=job.stage_sequence+1,
+                            label="Электронный чек готов", effect="done", status="done",
+                            elapsed_ms=0, progress=100)
                 job.publish("complete", result=result, progress=100, title="Электронный чек готов")
         except Exception as error:
             (job.directory / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
             job.status = "failed"
             job.error = str(error) if isinstance(error, ValueError) else "Не удалось завершить обработку. Попробуйте другое фото."
+            job.finish_stage("error", job.error)
             job.publish("error", title=job.error, progress=job.progress)
             traceback.print_exc()
         finally:

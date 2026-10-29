@@ -20,7 +20,7 @@ from App.table_boundary import detect_table_boundary
 from App.web_pipeline import decode_photo, grid_cells
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = (Path("R:/TEMP") if Path("R:/TEMP").exists() else ROOT/"experiments")/"ocr_visual_restore"
+OUT = (Path("R:/TEMP") if Path("R:/TEMP").exists() else ROOT/"experiment_outputs")/"ocr_visual_restore"
 BASE = "http://127.0.0.1:8023"
 
 

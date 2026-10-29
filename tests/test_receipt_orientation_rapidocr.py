@@ -11,7 +11,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from experiments import receipt_orientation_detector as orient
+from App import receipt_orientation_detector as orient
 
 
 def fake_receipt():
@@ -142,7 +142,7 @@ class OrientationV14Tests(unittest.TestCase):
             source = Path(td) / "photo.png"
             output = Path(td) / "out" / "oriented.png"
             cv2.imwrite(str(source), im)
-            cmd = [sys.executable, "-m", "experiments.receipt_orientation_detector",
+            cmd = [sys.executable, "-m", "App.receipt_orientation_detector",
                    str(source), "--output", str(output)]
             proc = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)
